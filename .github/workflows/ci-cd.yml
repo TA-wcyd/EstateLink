@@ -9,25 +9,28 @@ on:
       - "**"
 
 jobs:
-  laravel-tests:
+  laravel-ci:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: mbstring, pdo, sqlite, pdo_sqlite, fileinfo
+          extensions: mbstring, sqlite3, pdo_sqlite, fileinfo
           coverage: none
 
-      - name: Copy Environment File
+      - name: Verify PHP Version
+        run: php -v
+
+      - name: Copy .env
         run: cp .env.example .env
 
       - name: Install Composer Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Generate Application Key
         run: php artisan key:generate
@@ -35,10 +38,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: "22"
+          cache: "npm"
 
-      - name: Install Node Dependencies
+      - name: Install NPM Dependencies
         run: npm ci
 
       - name: Build Frontend
@@ -55,7 +58,7 @@ jobs:
           DB_DATABASE: database/database.sqlite
         run: php artisan migrate --force
 
-      - name: Run Laravel Tests
+      - name: Run Tests
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
