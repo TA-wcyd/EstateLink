@@ -21,7 +21,8 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \App\Http\Middleware\TestMiddleware::class,
+        // TestMiddleware removed from global stack — was blocking all API routes.
+        // Apply it selectively via ->middleware('test.token') if needed.
     ];
 
     /**
@@ -65,5 +66,7 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'admin'      => \App\Http\Middleware\AdminMiddleware::class,
+        'test.token' => \App\Http\Middleware\TestMiddleware::class,
     ];
 }
