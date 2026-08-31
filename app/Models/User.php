@@ -79,4 +79,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(Post::class);
     }
+
+    /**
+     * Properties listed by this user (as a seller/owner).
+     */
+    public function properties()
+    {
+        return $this->hasMany(Property::class);
+    }
+
+    /**
+     * Properties reviewed by this user (as an administrator).
+     */
+    public function reviewedProperties()
+    {
+        return $this->hasMany(Property::class, 'reviewed_by');
+    }
 }
