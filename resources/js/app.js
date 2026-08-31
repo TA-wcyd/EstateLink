@@ -1,6 +1,8 @@
 /**
  * EstateLink - Frontend Application
- * Handles theme toggling, authentication modal (Buyer/Seller vs Admin), and session state.
+ * Handles authentication, client-side SPA routing, property listing,
+ * public browsing with pagination, seller property submission,
+ * and admin verification workflows.
  */
 
 import './bootstrap';
@@ -10,7 +12,16 @@ const state = {
   token: localStorage.getItem('estatelink_token') || null,
   user: JSON.parse(localStorage.getItem('estatelink_user') || 'null'),
   theme: localStorage.getItem('estatelink_theme') || 'light',
-  signInRole: 'user' // 'user' (Buyer/Seller) or 'admin'
+  signInRole: 'user', // 'user' (Buyer/Seller) or 'admin'
+  currentRoute: '/',
+  sellForm: {
+    selectedImages: [],   // Array of File objects
+    existingImages: [],   // Array of {id, url, is_primary} when editing
+    nidFile: null,
+    propFile: null,
+    editId: null
+  },
+  adminQueueTab: 'pending'
 };
 
 // Initialize App on DOM Ready
@@ -18,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   initAuthSession();
   bindEventHandlers();
+  initRouter();
 });
 
 /* ==========================================================================
@@ -39,6 +51,108 @@ function toggleTheme() {
 }
 
 /* ==========================================================================
+   Client-Side SPA Routing
+   ========================================================================== */
+window.navigateTo = function (path) {
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+  }
+  handleRoute(path);
+};
+
+function initRouter() {
+  window.addEventListener('popstate', () => {
+    handleRoute(window.location.pathname);
+  });
+  handleRoute(window.location.pathname);
+}
+
+function handleRoute(path) {
+  state.currentRoute = path;
+  
+  // Direct property link /properties/:id
+  if (path.startsWith('/properties/')) {
+    const id = path.split('/')[2];
+    if (id && !isNaN(id)) {
+      showView('view-properties');
+      loadPublicProperties(1);
+      openPropertyDetailModal(id);
+      updateNavActiveState('/properties');
+      return;
+    }
+  }
+
+  // Update Nav Active states
+  updateNavActiveState(path);
+
+  switch (path) {
+    case '/properties':
+      showView('view-properties');
+      loadPublicProperties(1);
+      break;
+
+    case '/sell-property':
+      if (!state.token || !state.user) {
+        showToast('Please sign in to list your property.', 'info');
+        openAuthModal('login', 'user');
+        navigateTo('/');
+        return;
+      }
+      showView('view-sell-property');
+      if (!state.sellForm.editId) {
+        resetSellForm();
+      }
+      break;
+
+    case '/my-properties':
+      if (!state.token || !state.user) {
+        showToast('Please sign in to view your listings.', 'info');
+        openAuthModal('login', 'user');
+        navigateTo('/');
+        return;
+      }
+      showView('view-my-properties');
+      loadMyProperties();
+      break;
+
+    case '/admin/properties':
+      if (!state.token || !state.user || state.user.role !== 'admin') {
+        showToast('Admin authorization required.', 'error');
+        navigateTo('/');
+        return;
+      }
+      showView('view-admin-properties');
+      loadAdminQueue(state.adminQueueTab);
+      break;
+
+    case '/':
+    default:
+      showView('view-home');
+      break;
+  }
+}
+
+function showView(viewId) {
+  document.querySelectorAll('.app-view').forEach(view => {
+    view.classList.remove('active');
+  });
+  const target = document.getElementById(viewId);
+  if (target) {
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function updateNavActiveState(path) {
+  document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+  if (path === '/') document.getElementById('nav-link-home')?.classList.add('active');
+  else if (path.startsWith('/properties')) document.getElementById('nav-link-properties')?.classList.add('active');
+  else if (path === '/sell-property') document.getElementById('nav-link-sell')?.classList.add('active');
+  else if (path === '/my-properties') document.getElementById('nav-link-my-properties')?.classList.add('active');
+  else if (path.startsWith('/admin')) document.getElementById('nav-link-admin-queue')?.classList.add('active');
+}
+
+/* ==========================================================================
    Authentication & Session State Sync
    ========================================================================== */
 async function initAuthSession() {
@@ -52,6 +166,8 @@ async function initAuthSession() {
   const heroGuestBadge = document.getElementById('hero-guest-badge');
   const heroUserBadge = document.getElementById('hero-user-badge');
   const heroGreeting = document.getElementById('hero-user-greeting');
+  const myListingsNav = document.getElementById('nav-link-my-properties');
+  const adminQueueNav = document.getElementById('nav-link-admin-queue');
   const showcaseTag = document.getElementById('showcase-status-tag');
 
   if (state.token && state.user) {
@@ -69,7 +185,6 @@ async function initAuthSession() {
         state.user = data.user;
         localStorage.setItem('estatelink_user', JSON.stringify(data.user));
       } else if (response.status === 401) {
-        // Token has expired or been revoked
         logout(false);
         return;
       }
@@ -77,7 +192,7 @@ async function initAuthSession() {
       console.warn('Unable to sync profile with server:', error);
     }
 
-    // --- LOGGED-IN STATE: All "Sign In" options are hidden ---
+    // --- LOGGED-IN STATE ---
     if (guestNav) guestNav.style.display = 'none';
     if (userNav) userNav.style.display = 'flex';
     if (userNameEl) userNameEl.textContent = state.user.name;
@@ -92,6 +207,7 @@ async function initAuthSession() {
     if (heroGuestActions) heroGuestActions.style.display = 'none';
     if (heroUserActions) heroUserActions.style.display = 'flex';
     if (heroGuestBadge) heroGuestBadge.style.display = 'none';
+    if (myListingsNav) myListingsNav.style.display = 'inline-flex';
 
     if (heroUserBadge) {
       heroUserBadge.style.display = 'inline-flex';
@@ -99,11 +215,18 @@ async function initAuthSession() {
       if (heroGreeting) heroGreeting.textContent = `Logged in as ${state.user.name} (${roleLabel})`;
     }
 
+    if (adminQueueNav) {
+      adminQueueNav.style.display = state.user.role === 'admin' ? 'inline-flex' : 'none';
+      if (state.user.role === 'admin') {
+        loadAdminPendingCount();
+      }
+    }
+
     if (showcaseTag) {
       showcaseTag.textContent = state.user.role === 'admin' ? '★ Admin Active' : '✓ Member Active';
     }
   } else {
-    // --- GUEST STATE: Show Sign In options ---
+    // --- GUEST STATE ---
     if (guestNav) guestNav.style.display = 'flex';
     if (userNav) userNav.style.display = 'none';
 
@@ -111,11 +234,1015 @@ async function initAuthSession() {
     if (heroUserActions) heroUserActions.style.display = 'none';
     if (heroGuestBadge) heroGuestBadge.style.display = 'inline-flex';
     if (heroUserBadge) heroUserBadge.style.display = 'none';
+    if (myListingsNav) myListingsNav.style.display = 'none';
+    if (adminQueueNav) adminQueueNav.style.display = 'none';
 
     if (showcaseTag) {
       showcaseTag.textContent = '✓ Verified';
     }
   }
+}
+
+/* ==========================================================================
+   PUBLIC PROPERTIES PAGE LOGIC (GET /api/properties)
+   ========================================================================== */
+window.loadPublicProperties = async function (page = 1) {
+  const container = document.getElementById('public-properties-container');
+  const pagination = document.getElementById('public-pagination-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading verified properties...</p>
+    </div>
+  `;
+  if (pagination) pagination.innerHTML = '';
+
+  const search = document.getElementById('filter-search')?.value.trim() || '';
+  const type = document.getElementById('filter-type')?.value || '';
+  const bedrooms = document.getElementById('filter-bedrooms')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+
+  const queryParams = new URLSearchParams({
+    page: page,
+    per_page: 9
+  });
+  if (search) queryParams.append('search', search);
+  if (type) queryParams.append('property_type', type);
+  if (bedrooms) queryParams.append('bedrooms', bedrooms);
+  if (status) queryParams.append('transaction_status', status);
+
+  try {
+    const response = await fetch(`/api/properties?${queryParams.toString()}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) throw new Error('Failed to load properties');
+
+    const result = await response.json();
+    const properties = result.data || [];
+
+    if (properties.length === 0) {
+      container.innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">🏢</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 6px;">No Verified Properties Found</h3>
+          <p style="margin-bottom: 16px;">There are no approved listings matching your current search criteria.</p>
+          <button class="btn btn-secondary btn-sm" onclick="resetPublicFilters()">Reset Filters</button>
+        </div>
+      `;
+      return;
+    }
+
+    // Render Grid Cards
+    let html = '<div class="properties-grid">';
+    properties.forEach(p => {
+      const fallbackImage = '/images/hero_building.jpg';
+      const imageUrl = p.main_image || fallbackImage;
+      const formattedPrice = formatCurrency(p.price);
+      const statusLabel = (p.transaction_status || 'available').replace(/_/g, ' ');
+
+      html += `
+        <div class="property-card">
+          <div class="card-image-wrap">
+            <img src="${imageUrl}" alt="${escapeHtml(p.title)}" class="card-image" onerror="this.src='${fallbackImage}'">
+            <div class="card-badges">
+              <span class="status-chip chip-type">${escapeHtml(p.property_type)}</span>
+              <span class="status-chip chip-${p.transaction_status || 'available'}">${escapeHtml(statusLabel)}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card-price">${formattedPrice}</div>
+            <h3 class="card-title" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</h3>
+            <div class="card-location">
+              <span>📍</span> ${escapeHtml(p.location)}
+            </div>
+            <div class="card-specs">
+              <span class="spec-item">📐 ${p.size} sqft</span>
+              ${p.bedrooms !== null ? `<span class="spec-item">🛏️ ${p.bedrooms} Beds</span>` : ''}
+              ${p.bathrooms !== null ? `<span class="spec-item">🚿 ${p.bathrooms} Baths</span>` : ''}
+            </div>
+            <div class="card-footer">
+              <div class="seller-mini">
+                <div class="seller-avatar-mini">✓</div>
+                <div>
+                  <strong>${escapeHtml(p.seller?.name || 'Verified Seller')}</strong>
+                  ${p.seller?.company_name ? `<div style="font-size: 0.72rem; color: var(--color-text-muted);">${escapeHtml(p.seller.company_name)}</div>` : ''}
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openPropertyDetailModal(${p.id})">
+                View Details
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+
+    // Render Pagination
+    renderPagination(result, pagination, 'loadPublicProperties');
+
+  } catch (error) {
+    console.error('Properties load error:', error);
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="state-icon">⚠️</div>
+        <h3>Unable to load properties</h3>
+        <p>Please check your internet connection or server status.</p>
+        <button class="btn btn-primary btn-sm" style="margin-top: 12px;" onclick="loadPublicProperties(${page})">Try Again</button>
+      </div>
+    `;
+  }
+};
+
+window.resetPublicFilters = function () {
+  const searchInput = document.getElementById('filter-search');
+  const typeSelect = document.getElementById('filter-type');
+  const bedsSelect = document.getElementById('filter-bedrooms');
+  const statusSelect = document.getElementById('filter-status');
+
+  if (searchInput) searchInput.value = '';
+  if (typeSelect) typeSelect.value = '';
+  if (bedsSelect) bedsSelect.value = '';
+  if (statusSelect) statusSelect.value = '';
+
+  loadPublicProperties(1);
+};
+
+/* ==========================================================================
+   PUBLIC PROPERTY DETAIL MODAL (GET /api/properties/{id})
+   ========================================================================== */
+window.openPropertyDetailModal = async function (id) {
+  const modal = document.getElementById('modal-property-detail');
+  const body = document.getElementById('property-detail-body');
+  const titleEl = document.getElementById('detail-modal-title');
+  if (!modal || !body) return;
+
+  closeAllModals();
+  modal.classList.add('active');
+  body.innerHTML = `
+    <div class="state-box" style="padding: 40px 0;">
+      <div class="spinner"></div>
+      <p>Loading property details...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`/api/properties/${id}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      body.innerHTML = `
+        <div class="state-box">
+          <h3>Property Not Available</h3>
+          <p>This property may not exist or is currently awaiting admin verification.</p>
+          <button class="btn btn-secondary btn-sm" style="margin-top: 12px;" onclick="closeAllModals()">Close</button>
+        </div>
+      `;
+      return;
+    }
+
+    const data = await response.json();
+    const p = data.property;
+
+    if (titleEl) titleEl.textContent = p.title;
+
+    const fallbackImage = '/images/hero_building.jpg';
+    const mainImg = p.main_image || fallbackImage;
+    const imagesList = p.images && p.images.length > 0 ? p.images : [{ id: 0, url: mainImg }];
+    const contactPhone = p.phone || p.seller?.phone;
+
+    body.innerHTML = `
+      <div style="margin-bottom: 20px;">
+        <div style="position: relative; height: 340px; border-radius: var(--radius-lg); overflow: hidden; background: #0f172a; margin-bottom: 12px;">
+          <img id="detail-main-img" src="${mainImg}" alt="${escapeHtml(p.title)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${fallbackImage}'">
+          <div style="position: absolute; top: 12px; left: 12px; display: flex; gap: 8px;">
+            <span class="status-chip chip-type">${escapeHtml(p.property_type)}</span>
+            <span class="status-chip chip-${p.transaction_status || 'available'}">${escapeHtml((p.transaction_status || 'available').replace(/_/g, ' '))}</span>
+          </div>
+        </div>
+
+        ${imagesList.length > 1 ? `
+          <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px;">
+            ${imagesList.map(img => `
+              <img src="${img.url}" style="width: 70px; height: 55px; object-fit: cover; border-radius: var(--radius-md); cursor: pointer; border: 2px solid var(--color-border);" onclick="document.getElementById('detail-main-img').src='${img.url}'" onerror="this.src='${fallbackImage}'">
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 4px;">${escapeHtml(p.title)}</h2>
+          <div style="color: var(--color-text-muted); font-size: 0.9rem;">📍 ${escapeHtml(p.address || p.location)}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 1.6rem; font-weight: 800; color: var(--color-brand);">${formatCurrency(p.price)}</div>
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">Verified Listing</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; background: var(--color-input); padding: 14px; border-radius: var(--radius-md); margin-bottom: 20px;">
+        <div><span style="color: var(--color-text-muted); font-size: 0.75rem; display: block;">SIZE</span><strong>${p.size} Sq. Ft</strong></div>
+        ${p.bedrooms !== null ? `<div><span style="color: var(--color-text-muted); font-size: 0.75rem; display: block;">BEDROOMS</span><strong>${p.bedrooms} Beds</strong></div>` : ''}
+        ${p.bathrooms !== null ? `<div><span style="color: var(--color-text-muted); font-size: 0.75rem; display: block;">BATHROOMS</span><strong>${p.bathrooms} Baths</strong></div>` : ''}
+        <div><span style="color: var(--color-text-muted); font-size: 0.75rem; display: block;">PROPERTY TYPE</span><strong style="text-transform: capitalize;">${p.property_type}</strong></div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 8px;">Description</h4>
+        <p style="color: var(--color-text-muted); line-height: 1.6; font-size: 0.95rem; white-space: pre-line;">${escapeHtml(p.description)}</p>
+      </div>
+
+      <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="user-avatar" style="width: 44px; height: 44px; font-size: 1.1rem;">
+            ${(p.seller?.name || 'S')[0].toUpperCase()}
+          </div>
+          <div>
+            <h4 style="font-size: 1rem; margin-bottom: 2px;">${escapeHtml(p.seller?.name || 'Verified Owner')}</h4>
+            <div style="font-size: 0.8rem; color: var(--color-text-muted);">
+              ${p.seller?.company_name ? escapeHtml(p.seller.company_name) + ' • ' : ''}
+              <span style="color: var(--color-success); font-weight: 700;">✓ Verified Seller</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          ${contactPhone ? `
+            <a href="tel:${escapeHtml(contactPhone)}" class="btn btn-primary">
+              📞 Call ${escapeHtml(contactPhone)}
+            </a>
+          ` : `
+            <button class="btn btn-primary" onclick="showToast('Contact seller via EstateLink')">Contact Seller</button>
+          `}
+        </div>
+      </div>
+    `;
+
+  } catch (error) {
+    console.error('Property detail error:', error);
+  }
+};
+
+/* ==========================================================================
+   SELL PROPERTY FORM WORKFLOW (POST /api/properties)
+   ========================================================================== */
+window.handlePropertyTypeChange = function () {
+  const type = document.getElementById('prop-type')?.value;
+  const bedsRow = document.getElementById('row-beds-baths');
+  if (bedsRow) {
+    if (type === 'land' || type === 'commercial') {
+      bedsRow.style.display = 'none';
+    } else {
+      bedsRow.style.display = 'grid';
+    }
+  }
+};
+
+window.handleImageSelection = function (event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  const validFiles = files.filter(file => {
+    if (file.size > 20 * 1024 * 1024) {
+      showToast(`Image "${file.name}" exceeds 20MB limit.`, 'error');
+      return false;
+    }
+    return true;
+  });
+
+  state.sellForm.selectedImages.push(...validFiles);
+  renderImagePreviews();
+  event.target.value = '';
+};
+
+function renderImagePreviews() {
+  const container = document.getElementById('image-previews-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  // Render existing images if editing
+  state.sellForm.existingImages.forEach((img, idx) => {
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+    item.innerHTML = `
+      <img src="${img.url}" class="preview-img">
+      <button type="button" class="preview-remove-btn" onclick="removeExistingImage(${img.id})">&times;</button>
+      ${img.is_primary ? '<span class="preview-primary-badge">PRIMARY COVER</span>' : ''}
+    `;
+    container.appendChild(item);
+  });
+
+  // Render newly selected images
+  state.sellForm.selectedImages.forEach((file, idx) => {
+    const item = document.createElement('div');
+    item.className = 'preview-item';
+    const objectUrl = URL.createObjectURL(file);
+
+    const isPrimary = (state.sellForm.existingImages.length === 0 && idx === 0);
+
+    item.innerHTML = `
+      <img src="${objectUrl}" class="preview-img">
+      <button type="button" class="preview-remove-btn" onclick="removeSelectedImage(${idx})">&times;</button>
+      ${isPrimary ? '<span class="preview-primary-badge">PRIMARY COVER</span>' : ''}
+    `;
+    container.appendChild(item);
+  });
+}
+
+window.removeSelectedImage = function (index) {
+  state.sellForm.selectedImages.splice(index, 1);
+  renderImagePreviews();
+};
+
+window.removeExistingImage = async function (imageId) {
+  if (!state.sellForm.editId) return;
+  try {
+    const response = await fetch(`/api/my-properties/${state.sellForm.editId}/images/${imageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+    if (response.ok) {
+      state.sellForm.existingImages = state.sellForm.existingImages.filter(img => img.id !== imageId);
+      renderImagePreviews();
+      showToast('Image removed.');
+    }
+  } catch (error) {
+    showToast('Failed to remove image', 'error');
+  }
+};
+
+window.handleDocSelection = function (event, type) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.size > 20 * 1024 * 1024) {
+    showToast(`Document "${file.name}" exceeds 20MB limit.`, 'error');
+    event.target.value = '';
+    return;
+  }
+
+  if (type === 'nid') {
+    state.sellForm.nidFile = file;
+    const nameEl = document.getElementById('nid-file-name');
+    const statusBox = document.getElementById('nid-file-status');
+    if (nameEl) nameEl.textContent = `🪪 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    if (statusBox) statusBox.style.display = 'flex';
+  } else {
+    state.sellForm.propFile = file;
+    const nameEl = document.getElementById('prop-file-name');
+    const statusBox = document.getElementById('prop-file-status');
+    if (nameEl) nameEl.textContent = `📑 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    if (statusBox) statusBox.style.display = 'flex';
+  }
+};
+
+window.clearDocSelection = function (type) {
+  if (type === 'nid') {
+    state.sellForm.nidFile = null;
+    document.getElementById('input-nid-doc').value = '';
+    document.getElementById('nid-file-status').style.display = 'none';
+  } else {
+    state.sellForm.propFile = null;
+    document.getElementById('input-prop-doc').value = '';
+    document.getElementById('prop-file-status').style.display = 'none';
+  }
+};
+
+function resetSellForm() {
+  state.sellForm = {
+    selectedImages: [],
+    existingImages: [],
+    nidFile: null,
+    propFile: null,
+    editId: null
+  };
+  document.getElementById('form-sell-property')?.reset();
+  document.getElementById('edit-property-id').value = '';
+  document.getElementById('sell-form-main-title').textContent = 'List Your Property on EstateLink';
+  document.getElementById('submit-property-btn').textContent = '🚀 Submit Property for Verification';
+  document.getElementById('nid-file-status').style.display = 'none';
+  document.getElementById('prop-file-status').style.display = 'none';
+
+  // Auto-fill phone with user's registered phone
+  const phoneInput = document.getElementById('prop-phone');
+  if (phoneInput && state.user?.phone) {
+    phoneInput.value = state.user.phone;
+  }
+
+  renderImagePreviews();
+}
+
+/* ==========================================================================
+   SELLER MY PROPERTIES DASHBOARD (GET /api/my-properties)
+   ========================================================================== */
+window.loadMyProperties = async function () {
+  const container = document.getElementById('my-properties-list-container');
+  if (!container || !state.token) return;
+
+  container.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading your listed properties...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch('/api/my-properties', {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to load listings');
+
+    const data = await response.json();
+    const properties = data.properties || [];
+    const summary = data.summary || { total: 0, approved: 0, pending: 0, rejected: 0 };
+
+    // Update Stats
+    document.getElementById('stat-total').textContent = summary.total;
+    document.getElementById('stat-approved').textContent = summary.approved;
+    document.getElementById('stat-pending').textContent = summary.pending;
+    document.getElementById('stat-rejected').textContent = summary.rejected;
+
+    if (properties.length === 0) {
+      container.innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">🏠</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 6px;">You haven't listed any properties yet</h3>
+          <p style="margin-bottom: 16px;">Submit your first property for Admin verification to connect with verified buyers.</p>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('/sell-property')">+ List Your Property</button>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    properties.forEach(p => {
+      const fallbackImage = '/images/hero_building.jpg';
+      const imageUrl = p.main_image || fallbackImage;
+
+      let statusBadge = '';
+      if (p.verification_status === 'approved') {
+        statusBadge = '<span class="status-chip chip-approved">✓ Live & Approved</span>';
+      } else if (p.verification_status === 'pending') {
+        statusBadge = '<span class="status-chip chip-pending">⏳ Pending Admin Verification</span>';
+      } else if (p.verification_status === 'rejected') {
+        statusBadge = '<span class="status-chip chip-rejected">❌ Verification Rejected</span>';
+      }
+
+      html += `
+        <div class="my-property-card">
+          <div>
+            <img src="${imageUrl}" class="my-prop-img" onerror="this.src='${fallbackImage}'">
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+              ${statusBadge}
+              <span class="status-chip chip-type">${escapeHtml(p.property_type)}</span>
+              <span style="font-size: 0.8rem; color: var(--color-text-muted);">Deal Status: <strong>${escapeHtml(p.transaction_status || 'available')}</strong></span>
+            </div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 4px;">${escapeHtml(p.title)}</h3>
+            <div style="font-size: 1.2rem; font-weight: 800; color: var(--color-brand); margin-bottom: 4px;">
+              ${formatCurrency(p.price)}
+            </div>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 8px;">
+              📍 ${escapeHtml(p.location)} • ${p.size} sqft • Contact: <strong>${escapeHtml(p.phone || 'N/A')}</strong>
+            </div>
+
+            ${p.verification_status === 'rejected' && p.rejection_reason ? `
+              <div class="rejection-banner">
+                <strong>Admin Rejection Note:</strong> ${escapeHtml(p.rejection_reason)}
+              </div>
+            ` : ''}
+
+            ${p.verification_status === 'pending' ? `
+              <div style="font-size: 0.8rem; color: #d97706; margin-top: 6px;">
+                ℹ️ Submitted on ${new Date(p.submitted_at || p.created_at).toLocaleDateString()}. Admin is reviewing your NID and documents.
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; min-width: 140px;">
+            ${p.verification_status === 'approved' ? `
+              <button class="btn btn-secondary btn-sm w-full" onclick="openPropertyDetailModal(${p.id})">Public View</button>
+            ` : ''}
+
+            ${p.verification_status === 'rejected' ? `
+              <button class="btn btn-primary btn-sm w-full" onclick="editProperty(${p.id})">✏️ Edit & Resubmit</button>
+              <button class="btn btn-secondary btn-sm w-full" onclick="resubmitProperty(${p.id})">Direct Resubmit</button>
+            ` : `
+              <button class="btn btn-secondary btn-sm w-full" onclick="editProperty(${p.id})">Edit Listing</button>
+            `}
+
+            <button class="btn btn-secondary btn-sm w-full" style="color: #ef4444;" onclick="deleteProperty(${p.id})">Delete</button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+
+  } catch (error) {
+    console.error('My properties load error:', error);
+  }
+};
+
+window.editProperty = async function (id) {
+  try {
+    const response = await fetch(`/api/my-properties/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch property');
+
+    const data = await response.json();
+    const p = data.property;
+
+    state.sellForm.editId = p.id;
+    state.sellForm.existingImages = p.images || [];
+    state.sellForm.selectedImages = [];
+
+    document.getElementById('edit-property-id').value = p.id;
+    document.getElementById('prop-title').value = p.title;
+    document.getElementById('prop-type').value = p.property_type;
+    document.getElementById('prop-price').value = p.price;
+    document.getElementById('prop-size').value = p.size;
+    document.getElementById('prop-bedrooms').value = p.bedrooms ?? '';
+    document.getElementById('prop-bathrooms').value = p.bathrooms ?? '';
+    document.getElementById('prop-location').value = p.location;
+    document.getElementById('prop-address').value = p.address;
+    document.getElementById('prop-phone').value = p.phone || state.user?.phone || '';
+    document.getElementById('prop-description').value = p.description;
+
+    document.getElementById('sell-form-main-title').textContent = `Edit Listing: #${p.id} ${p.title}`;
+    document.getElementById('submit-property-btn').textContent = '💾 Update & Submit for Verification';
+
+    handlePropertyTypeChange();
+    renderImagePreviews();
+    navigateTo('/sell-property');
+
+  } catch (error) {
+    showToast('Unable to edit property', 'error');
+  }
+};
+
+window.resubmitProperty = async function (id) {
+  if (!confirm('Resubmit this property for Admin verification?')) return;
+  try {
+    const response = await fetch(`/api/my-properties/${id}/resubmit`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      showToast(data.message || 'Property resubmitted for verification!', 'success');
+      loadMyProperties();
+    } else {
+      showToast(data.message || 'Failed to resubmit', 'error');
+    }
+  } catch (error) {
+    showToast('Failed to resubmit', 'error');
+  }
+};
+
+window.deleteProperty = async function (id) {
+  if (!confirm('Are you sure you want to delete this property listing? This action cannot be undone.')) return;
+
+  try {
+    const response = await fetch(`/api/my-properties/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      showToast('Property deleted successfully.');
+      loadMyProperties();
+    } else {
+      showToast('Failed to delete property.', 'error');
+    }
+  } catch (error) {
+    showToast('Unable to delete property.', 'error');
+  }
+};
+
+/* ==========================================================================
+   ADMIN VERIFICATION QUEUE & DOSSIER LOGIC
+   ========================================================================== */
+window.loadAdminPendingCount = async function () {
+  if (!state.token || !state.user || state.user.role !== 'admin') return;
+
+  try {
+    const response = await fetch('/api/admin/properties/pending', {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const count = data.total || (data.data ? data.data.length : 0);
+      const badge = document.getElementById('admin-pending-badge');
+      const countSpan = document.getElementById('admin-pending-count');
+      if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+      }
+      if (countSpan) countSpan.textContent = count;
+    }
+  } catch (error) {
+    console.warn('Unable to load admin pending count:', error);
+  }
+};
+
+window.loadAdminQueue = async function (tab = 'pending', page = 1) {
+  state.adminQueueTab = tab;
+  const container = document.getElementById('admin-queue-container');
+  const pagination = document.getElementById('admin-pagination-container');
+  const btnPending = document.getElementById('btn-admin-tab-pending');
+  const btnAll = document.getElementById('btn-admin-tab-all');
+
+  if (!container || !state.token) return;
+
+  if (tab === 'pending') {
+    btnPending?.classList.remove('btn-secondary');
+    btnPending?.classList.add('btn-primary');
+    btnAll?.classList.remove('btn-primary');
+    btnAll?.classList.add('btn-secondary');
+  } else {
+    btnAll?.classList.remove('btn-secondary');
+    btnAll?.classList.add('btn-primary');
+    btnPending?.classList.remove('btn-primary');
+    btnPending?.classList.add('btn-secondary');
+  }
+
+  container.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading verification queue...</p>
+    </div>
+  `;
+  if (pagination) pagination.innerHTML = '';
+
+  const endpoint = tab === 'pending'
+    ? `/api/admin/properties/pending?page=${page}`
+    : `/api/admin/properties/all?page=${page}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Admin queue fetch failed');
+
+    const result = await response.json();
+    const properties = result.data || [];
+
+    loadAdminPendingCount();
+
+    if (properties.length === 0) {
+      container.innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">🛡️</div>
+          <h3>${tab === 'pending' ? 'Verification Queue is Clear!' : 'No Properties Found'}</h3>
+          <p>${tab === 'pending' ? 'All submitted properties have been reviewed by administrators.' : 'No property records exist yet.'}</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    properties.forEach(p => {
+      const fallbackImage = '/images/hero_building.jpg';
+      const mainImg = (p.images && p.images[0]) ? p.images[0].url || p.images[0].image_path : fallbackImage;
+
+      let statusChip = '';
+      if (p.verification_status === 'approved') statusChip = '<span class="status-chip chip-approved">Approved</span>';
+      else if (p.verification_status === 'pending') statusChip = '<span class="status-chip chip-pending">⏳ Pending Review</span>';
+      else statusChip = '<span class="status-chip chip-rejected">Rejected</span>';
+
+      html += `
+        <div class="admin-queue-card">
+          <div>
+            <img src="${mainImg}" style="width: 100%; height: 100px; object-fit: cover; border-radius: var(--radius-md);" onerror="this.src='${fallbackImage}'">
+          </div>
+          <div>
+            <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: center;">
+              ${statusChip}
+              <span class="status-chip chip-type">${escapeHtml(p.property_type)}</span>
+              <strong style="color: var(--color-brand); font-size: 1.1rem;">${formatCurrency(p.price)}</strong>
+            </div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 2px;">#${p.id} ${escapeHtml(p.title)}</h3>
+            <div style="font-size: 0.825rem; color: var(--color-text-muted); margin-bottom: 6px;">
+              📍 ${escapeHtml(p.location)} • ${p.size} sqft • Phone: <strong>${escapeHtml(p.phone || p.user?.phone || 'N/A')}</strong>
+            </div>
+            <div style="font-size: 0.8rem; background: var(--color-input); padding: 6px 10px; border-radius: var(--radius-sm); display: inline-block;">
+              👤 Seller: <strong>${escapeHtml(p.user?.name || 'N/A')}</strong> • NID: <strong>${escapeHtml(p.user?.national_id || 'N/A')}</strong> • Email: <strong>${escapeHtml(p.user?.email || 'N/A')}</strong>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; min-width: 130px;">
+            <button class="btn btn-admin btn-sm w-full" onclick="openAdminReviewModal(${p.id})">
+              🔍 Audit & Verify
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    renderPagination(result, pagination, (p) => loadAdminQueue(tab, p));
+
+  } catch (error) {
+    console.error('Admin queue error:', error);
+  }
+};
+
+window.openAdminReviewModal = async function (id) {
+  const modal = document.getElementById('modal-admin-review');
+  const body = document.getElementById('admin-review-body');
+  if (!modal || !body) return;
+
+  closeAllModals();
+  modal.classList.add('active');
+  body.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading complete verification dossier...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`/api/admin/properties/${id}/verification`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Verification dossier fetch failed');
+
+    const data = await response.json();
+    const p = data.property;
+    const docs = data.documents || [];
+
+    const fallbackImage = '/images/hero_building.jpg';
+
+    body.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+        <!-- Left: Seller Verification Info -->
+        <div style="background: var(--color-input); padding: 16px; border-radius: var(--radius-md);">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--color-admin); margin-bottom: 10px;">👤 Seller Identity Dossier</h4>
+          <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 6px;">
+            <div><strong>Full Name:</strong> ${escapeHtml(p.user?.name || 'N/A')}</div>
+            <div><strong>Email:</strong> ${escapeHtml(p.user?.email || 'N/A')}</div>
+            <div><strong>Registered Phone:</strong> ${escapeHtml(p.user?.phone || 'N/A')}</div>
+            <div><strong>Listing Contact Phone:</strong> <span style="font-weight: 700; color: var(--color-brand);">${escapeHtml(p.phone || p.user?.phone || 'N/A')}</span></div>
+            <div><strong>National ID (NID):</strong> <span style="background: rgba(99,102,241,0.15); padding: 2px 6px; border-radius: 4px; font-weight: 700;">${escapeHtml(p.user?.national_id || 'N/A')}</span></div>
+            <div><strong>Company:</strong> ${escapeHtml(p.user?.company_name || 'Individual')}</div>
+            <div><strong>Account Status:</strong> <span style="text-transform: capitalize; font-weight: 600;">${escapeHtml(p.user?.verification_status || 'pending')}</span></div>
+          </div>
+        </div>
+
+        <!-- Right: Property Specs -->
+        <div style="background: var(--color-input); padding: 16px; border-radius: var(--radius-md);">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--color-brand); margin-bottom: 10px;">🏢 Property Details</h4>
+          <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 6px;">
+            <div><strong>Price:</strong> ${formatCurrency(p.price)}</div>
+            <div><strong>Type:</strong> <span style="text-transform: capitalize;">${p.property_type}</span></div>
+            <div><strong>Size:</strong> ${p.size} sqft</div>
+            <div><strong>Location:</strong> ${escapeHtml(p.location)}</div>
+            <div><strong>Address:</strong> ${escapeHtml(p.address)}</div>
+            <div><strong>Submitted:</strong> ${new Date(p.submitted_at || p.created_at).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 6px;">Description</h4>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted); background: var(--color-input); padding: 12px; border-radius: var(--radius-md);">${escapeHtml(p.description)}</p>
+      </div>
+
+      <!-- Uploaded Verification Documents -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;">📑 Uploaded Verification Documents (Private)</h4>
+        ${docs.length === 0 ? `
+          <div style="padding: 12px; background: rgba(239,68,68,0.08); border-radius: var(--radius-md); font-size: 0.85rem; color: #ef4444;">
+            ⚠️ No verification documents uploaded by seller!
+          </div>
+        ` : `
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${docs.map(d => `
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <span style="font-weight: 700; text-transform: uppercase; font-size: 0.75rem; background: var(--color-brand-soft); color: var(--color-brand); padding: 2px 8px; border-radius: 4px; margin-right: 6px;">
+                    ${d.document_type}
+                  </span>
+                  <span style="font-size: 0.9rem; font-weight: 600;">${escapeHtml(d.original_name)}</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="viewAdminDocument(${p.id}, ${d.id}, '${escapeHtml(d.original_name)}')">
+                    👁️ View Document
+                  </button>
+                  <button type="button" class="btn btn-primary btn-sm" onclick="downloadAdminDocument(${p.id}, ${d.id}, '${escapeHtml(d.original_name)}')">
+                    📥 Download
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- Photo Gallery (Shows ALL photos uploaded by seller) -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;">
+          📸 All Uploaded Property Photos (${(p.images && p.images.length) || 0})
+        </h4>
+        ${!p.images || p.images.length === 0 ? `
+          <p style="font-size: 0.85rem; color: var(--color-text-muted);">No property images uploaded.</p>
+        ` : `
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;">
+            ${p.images.map((img, idx) => `
+              <div style="position: relative; height: 110px; border-radius: var(--radius-md); overflow: hidden; border: 2px solid ${img.is_primary ? 'var(--color-brand)' : 'var(--color-border)'}; cursor: pointer;" onclick="window.open('${img.url}', '_blank')">
+                <img src="${img.url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${fallbackImage}'">
+                ${img.is_primary ? '<span style="position: absolute; bottom: 4px; left: 4px; background: var(--color-brand); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">COVER (1st)</span>' : ''}
+                <span style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.65); color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 4px;">#${idx + 1}</span>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- Admin Action Bar -->
+      <div style="border-top: 1px solid var(--color-border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          Current Verification: <strong>${escapeHtml(p.verification_status).toUpperCase()}</strong>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-danger" onclick="openAdminRejectModal(${p.id})">
+            ❌ Reject Listing
+          </button>
+          <button class="btn btn-success" onclick="adminApproveProperty(${p.id})">
+            ✓ Approve & Publish Listing
+          </button>
+        </div>
+      </div>
+    `;
+
+  } catch (error) {
+    console.error('Admin review error:', error);
+  }
+};
+
+/* Secure Admin Document Viewing / Downloading with Bearer Token */
+window.viewAdminDocument = async function (propertyId, documentId, filename) {
+  try {
+    showToast('Loading document for viewing...', 'info');
+    const response = await fetch(`/api/admin/properties/${propertyId}/documents/${documentId}/download?view=1`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Unable to view document');
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+  } catch (err) {
+    showToast('Failed to open document preview.', 'error');
+  }
+};
+
+window.downloadAdminDocument = async function (propertyId, documentId, filename) {
+  try {
+    showToast('Downloading document...', 'info');
+    const response = await fetch(`/api/admin/properties/${propertyId}/documents/${documentId}/download`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Unable to download document');
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename || 'document';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    showToast('Document downloaded successfully!', 'success');
+  } catch (err) {
+    showToast('Failed to download document.', 'error');
+  }
+};
+
+window.adminApproveProperty = async function (id) {
+  if (!confirm(`Are you sure you want to APPROVE property #${id}? It will become immediately visible on the public listing.`)) return;
+
+  try {
+    const response = await fetch(`/api/admin/properties/${id}/approve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      showToast(data.message || 'Property approved successfully!', 'success');
+      closeAllModals();
+      loadAdminQueue(state.adminQueueTab);
+    } else {
+      showToast(data.message || 'Approval failed', 'error');
+    }
+  } catch (error) {
+    showToast('Unable to approve property', 'error');
+  }
+};
+
+window.openAdminRejectModal = function (id) {
+  closeAllModals();
+  const modal = document.getElementById('modal-admin-reject');
+  const idInput = document.getElementById('reject-property-id');
+  const reasonInput = document.getElementById('reject-reason');
+  if (modal && idInput) {
+    idInput.value = id;
+    if (reasonInput) reasonInput.value = '';
+    modal.classList.add('active');
+  }
+};
+
+/* ==========================================================================
+   Helper Functions (Pagination, Modals, Formatters)
+   ========================================================================== */
+function renderPagination(paginatorData, container, handlerName) {
+  if (!container || !paginatorData || paginatorData.last_page <= 1) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+
+  const current = paginatorData.current_page;
+  const last = paginatorData.last_page;
+
+  let html = '';
+  const handlerFn = typeof handlerName === 'string' ? handlerName : 'loadPublicProperties';
+
+  html += `<button class="page-btn" ${current === 1 ? 'disabled' : ''} onclick="${handlerFn}(${current - 1})">‹ Prev</button>`;
+
+  for (let i = 1; i <= last; i++) {
+    if (i === 1 || i === last || (i >= current - 1 && i <= current + 1)) {
+      html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="${handlerFn}(${i})">${i}</button>`;
+    } else if (i === current - 2 || i === current + 2) {
+      html += `<span style="padding: 0 4px; color: var(--color-text-muted);">...</span>`;
+    }
+  }
+
+  html += `<button class="page-btn" ${current === last ? 'disabled' : ''} onclick="${handlerFn}(${current + 1})">Next ›</button>`;
+  container.innerHTML = html;
+}
+
+function formatCurrency(amount) {
+  if (amount === undefined || amount === null) return 'Tk 0';
+  return 'Tk ' + Number(amount).toLocaleString('en-IN');
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 /* ==========================================================================
@@ -212,8 +1339,8 @@ window.openProfileModal = function () {
         <div class="user-avatar" style="width: 52px; height: 52px; font-size: 1.25rem; margin: 0 auto 10px; ${user.role === 'admin' ? 'background-color: #6366f1;' : ''}">
           ${initials}
         </div>
-        <h3 style="font-size: 1.25rem; margin-bottom: 2px;">${user.name}</h3>
-        <p style="color: var(--color-text-muted); font-size: 0.85rem;">${user.email}</p>
+        <h3 style="font-size: 1.25rem; margin-bottom: 2px;">${escapeHtml(user.name)}</h3>
+        <p style="color: var(--color-text-muted); font-size: 0.85rem;">${escapeHtml(user.email)}</p>
         <div style="margin-top: 6px;">
           <span style="font-size: 0.75rem; font-weight: 700; padding: 2px 10px; border-radius: 9999px; ${user.role === 'admin' ? 'background: rgba(99,102,241,0.15); color: #6366f1;' : 'background: rgba(15,118,110,0.15); color: #0f766e;'}">
             ${user.role === 'admin' ? '★ System Administrator' : (user.verification_status === 'verified' ? '✓ Verified Buyer / Seller' : '⏳ Pending NID Verification')}
@@ -228,15 +1355,15 @@ window.openProfileModal = function () {
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">National ID:</span>
-          <strong>${user.national_id || 'N/A'}</strong>
+          <strong>${escapeHtml(user.national_id) || 'N/A'}</strong>
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Phone Number:</span>
-          <strong>${user.phone || 'N/A'}</strong>
+          <strong>${escapeHtml(user.phone) || 'N/A'}</strong>
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span style="color: var(--color-text-muted);">Company / Agency:</span>
-          <strong>${user.company_name || 'Individual'}</strong>
+          <strong>${escapeHtml(user.company_name) || 'Individual'}</strong>
         </div>
       </div>
 
@@ -256,7 +1383,7 @@ window.closeAllModals = function () {
 };
 
 /* ==========================================================================
-   Event Bindings
+   Event Bindings & Form Handlers
    ========================================================================== */
 function bindEventHandlers() {
   // Theme toggle button
@@ -281,6 +1408,13 @@ function bindEventHandlers() {
       emailInput.value = 'tamjid@gmail.com';
       passwordInput.value = 'tamjid123';
       showToast('Admin credentials filled');
+    }
+  });
+
+  // Search input enter key
+  document.getElementById('filter-search')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      loadPublicProperties(1);
     }
   });
 
@@ -314,15 +1448,14 @@ function bindEventHandlers() {
           localStorage.setItem('estatelink_token', data.token);
           localStorage.setItem('estatelink_user', JSON.stringify(data.user));
 
-          if (state.signInRole === 'admin' && data.user.role !== 'admin') {
-            showToast(`Signed in as ${data.user.name} (Member account)`);
-          } else {
-            showToast(`Welcome back, ${data.user.name}!`);
-          }
-
+          showToast(`Welcome back, ${data.user.name}!`);
           initAuthSession();
           closeAllModals();
           loginForm.reset();
+
+          if (state.currentRoute === '/sell-property') {
+            handleRoute('/sell-property');
+          }
         } else {
           const errorMessage = data.errors
             ? Object.values(data.errors).flat().join(', ')
@@ -330,7 +1463,7 @@ function bindEventHandlers() {
           showToast(errorMessage, 'error');
         }
       } catch (error) {
-        showToast('Unable to connect to the server. Please try again.', 'error');
+        showToast('Unable to connect to the server.', 'error');
       } finally {
         submitBtn.disabled = false;
         setSignInRole(state.signInRole);
@@ -384,7 +1517,7 @@ function bindEventHandlers() {
           localStorage.setItem('estatelink_token', data.token);
           localStorage.setItem('estatelink_user', JSON.stringify(data.user));
 
-          showToast('Buyer / Seller account registered successfully!');
+          showToast('Account registered successfully!');
           initAuthSession();
           closeAllModals();
           registerForm.reset();
@@ -395,10 +1528,139 @@ function bindEventHandlers() {
           showToast(errorMessage, 'error');
         }
       } catch (error) {
-        showToast('Unable to connect to the server. Please try again.', 'error');
+        showToast('Unable to connect to the server.', 'error');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create Buyer / Seller Account';
+      }
+    });
+  }
+
+  // Sell Property Form Submission
+  const sellForm = document.getElementById('form-sell-property');
+  if (sellForm) {
+    sellForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      if (!state.token) {
+        showToast('Please sign in before submitting.', 'error');
+        openAuthModal('login', 'user');
+        return;
+      }
+
+      const editId = document.getElementById('edit-property-id').value;
+      const title = document.getElementById('prop-title').value.trim();
+      const property_type = document.getElementById('prop-type').value;
+      const price = document.getElementById('prop-price').value;
+      const size = document.getElementById('prop-size').value;
+      const bedrooms = document.getElementById('prop-bedrooms').value;
+      const bathrooms = document.getElementById('prop-bathrooms').value;
+      const location = document.getElementById('prop-location').value.trim();
+      const address = document.getElementById('prop-address').value.trim();
+      const phone = document.getElementById('prop-phone').value.trim();
+      const description = document.getElementById('prop-description').value.trim();
+      const submitBtn = document.getElementById('submit-property-btn');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading details & documents...';
+
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('property_type', property_type);
+      formData.append('price', price);
+      formData.append('size', size);
+      if (bedrooms) formData.append('bedrooms', bedrooms);
+      if (bathrooms) formData.append('bathrooms', bathrooms);
+      formData.append('location', location);
+      formData.append('address', address);
+      if (phone) formData.append('phone', phone);
+      formData.append('description', description);
+
+      // Append image files
+      state.sellForm.selectedImages.forEach(file => {
+        formData.append('images[]', file);
+      });
+
+      // Append documents
+      if (state.sellForm.nidFile) {
+        formData.append('nid_document', state.sellForm.nidFile);
+      }
+      if (state.sellForm.propFile) {
+        formData.append('property_document', state.sellForm.propFile);
+      }
+
+      const url = editId ? `/api/my-properties/${editId}` : '/api/properties';
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${state.token}`,
+            'Accept': 'application/json'
+          },
+          body: formData
+        });
+
+        if (response.status === 401) {
+          logout(false);
+          openAuthModal('login', 'user');
+          showToast('Your session has expired. Please sign in again.', 'error');
+          return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(data.message || 'Your property has been submitted and is waiting for Admin verification.', 'success');
+          resetSellForm();
+          navigateTo('/my-properties');
+        } else {
+          const errorMessage = data.errors
+            ? Object.values(data.errors).flat().join(', ')
+            : (data.message || 'Submission failed. Please check form inputs.');
+          showToast(errorMessage, 'error');
+        }
+      } catch (error) {
+        console.error('Submission error:', error);
+        showToast('Error during submission. Please try again.', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = editId ? '💾 Update & Submit for Verification' : '🚀 Submit Property for Verification';
+      }
+    });
+  }
+
+  // Admin Rejection Form Submission
+  const adminRejectForm = document.getElementById('form-admin-reject');
+  if (adminRejectForm) {
+    adminRejectForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const id = document.getElementById('reject-property-id').value;
+      const rejection_reason = document.getElementById('reject-reason').value.trim();
+
+      if (!id || !rejection_reason) return;
+
+      try {
+        const response = await fetch(`/api/admin/properties/${id}/reject`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${state.token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ rejection_reason })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          showToast('Property rejected and seller notified with reason.');
+          closeAllModals();
+          loadAdminQueue(state.adminQueueTab);
+        } else {
+          showToast(data.message || 'Rejection failed', 'error');
+        }
+      } catch (error) {
+        showToast('Error rejecting property', 'error');
       }
     });
   }
@@ -430,6 +1692,7 @@ window.logout = async function (notifyServer = true) {
   initAuthSession();
   closeAllModals();
   showToast('You have been signed out.');
+  navigateTo('/');
 };
 
 /* ==========================================================================
@@ -445,7 +1708,7 @@ window.showToast = function (message, type = 'info') {
   }
 
   const toastItem = document.createElement('div');
-  toastItem.className = `toast-message ${type === 'error' ? 'error' : ''}`;
+  toastItem.className = `toast-message ${type}`;
   toastItem.textContent = message;
   toastContainer.appendChild(toastItem);
 
