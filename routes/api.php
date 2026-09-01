@@ -36,8 +36,10 @@ Route::get('/properties/{id}', [PropertyController::class, 'show']);
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth session
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me',      [AuthController::class, 'me']);
+    Route::post('/logout',  [AuthController::class, 'logout']);
+    Route::get('/me',       [AuthController::class, 'me']);
+    Route::put('/profile',  [AuthController::class, 'updateProfile']);
+    Route::post('/profile', [AuthController::class, 'updateProfile']);
 
     // ─────────────────────────────────────────
     //  Seller / Property Management Endpoints

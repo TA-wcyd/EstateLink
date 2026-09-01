@@ -143,4 +143,49 @@ class AuthController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Update the authenticated user's profile information.
+     *
+     * PUT/POST /api/profile  (requires auth:sanctum)
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name'         => ['required', 'string', 'max:255'],
+            'phone'        => ['required', 'string', 'max:30'],
+            'national_id'  => ['required', 'string', 'max:50', 'unique:users,national_id,' . $user->id],
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'facebook_url' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user->name         = $validated['name'];
+        $user->phone        = $validated['phone'];
+        $user->national_id  = $validated['national_id'];
+        $user->company_name = $validated['company_name'] ?? null;
+        if (array_key_exists('facebook_url', $validated)) {
+            $user->facebook_url = $validated['facebook_url'];
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user'    => [
+                'id'                  => $user->id,
+                'name'                => $user->name,
+                'email'               => $user->email,
+                'phone'               => $user->phone,
+                'national_id'         => $user->national_id,
+                'facebook_url'        => $user->facebook_url,
+                'company_name'        => $user->company_name,
+                'role'                => $user->role,
+                'verification_status' => $user->verification_status,
+                'created_at'          => $user->created_at,
+            ],
+        ]);
+    }
 }

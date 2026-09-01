@@ -46,6 +46,9 @@
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-my-properties" onclick="navigateTo('/my-properties')" style="display: none;">
                         My Listings
                     </a>
+                    <a href="javascript:void(0)" class="nav-link" id="nav-link-profile" onclick="navigateTo('/profile')" style="display: none;">
+                        👤 Profile & Submissions
+                    </a>
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-admin-queue" onclick="navigateTo('/admin/properties')" style="display: none; color: var(--color-admin);">
                         🛡️ Admin Queue <span class="nav-badge" id="admin-pending-badge" style="display: none;">0</span>
                     </a>
@@ -67,7 +70,7 @@
 
                     <!-- Logged In State: User Info & Sign Out (Shown ONLY when logged in) -->
                     <div id="nav-user-state" style="display: none; align-items: center; gap: 10px;">
-                        <div class="user-profile-badge" onclick="openProfileModal()" title="View your profile">
+                        <div class="user-profile-badge" onclick="navigateTo('/profile')" title="View your profile & submissions">
                             <div class="user-avatar" id="nav-user-avatar">U</div>
                             <span id="nav-user-name">User</span>
                         </div>
@@ -463,6 +466,190 @@
                 </div>
 
                 <div id="admin-pagination-container" class="pagination-wrap"></div>
+            </div>
+
+            <!-- ===============================================================
+                 VIEW 6: USER PROFILE & SUBMISSIONS DASHBOARD (/profile)
+                 =============================================================== -->
+            <div id="view-profile" class="app-view">
+                <div class="page-header" style="margin-bottom: 28px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                        <div>
+                            <div class="pill-tag"><span>👤</span><span>User Dashboard</span></div>
+                            <h2 class="page-title">My Account & Profile</h2>
+                            <p class="page-subtitle">Manage your personal credentials, National ID verification details, and track your property submissions in real time.</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-primary" onclick="navigateTo('/sell-property')">
+                                + List New Property
+                            </button>
+                            <button class="btn btn-secondary" onclick="logout(true)" style="color: var(--color-danger);">
+                                Sign Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-grid">
+                    <!-- LEFT COLUMN: Profile Info Card (View & Edit Modes) -->
+                    <div class="profile-card-col">
+                        
+                        <!-- 1. Profile Overview / View Mode Card -->
+                        <div class="profile-card" id="profile-view-card">
+                            <div class="profile-card-header">
+                                <div class="profile-avatar-large" id="profile-page-avatar">U</div>
+                                <h3 class="profile-name" id="profile-page-name">User Name</h3>
+                                <p class="profile-email" id="profile-page-email">email@example.com</p>
+                                <div id="profile-page-badge-wrap" style="margin-top: 8px;"></div>
+                            </div>
+
+                            <div class="profile-divider"></div>
+
+                            <div class="profile-details-list">
+                                <div class="profile-detail-row">
+                                    <span class="detail-label">Account Type</span>
+                                    <span class="detail-value" id="profile-page-type">Buyer / Seller</span>
+                                </div>
+                                <div class="profile-detail-row">
+                                    <span class="detail-label">National ID (NID)</span>
+                                    <span class="detail-value" id="profile-page-nid">N/A</span>
+                                </div>
+                                <div class="profile-detail-row">
+                                    <span class="detail-label">Phone Number</span>
+                                    <span class="detail-value" id="profile-page-phone">N/A</span>
+                                </div>
+                                <div class="profile-detail-row">
+                                    <span class="detail-label">Company / Agency</span>
+                                    <span class="detail-value" id="profile-page-company">Individual</span>
+                                </div>
+                                <div class="profile-detail-row" id="row-profile-facebook">
+                                    <span class="detail-label">Social / Website</span>
+                                    <span class="detail-value" id="profile-page-facebook">Not provided</span>
+                                </div>
+                                <div class="profile-detail-row">
+                                    <span class="detail-label">Verification Status</span>
+                                    <span class="detail-value" id="profile-page-status">Pending NID Verification</span>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 24px;">
+                                <button class="btn btn-primary w-full" onclick="toggleProfileEdit(true)">
+                                    ✏️ Edit Profile Information
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Profile Edit Mode Card (Hidden by default) -->
+                        <div class="profile-card" id="profile-edit-card" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <h3 style="font-size: 1.15rem; font-weight: 700;">Edit Profile Details</h3>
+                                <button class="btn btn-secondary btn-sm" onclick="toggleProfileEdit(false)">Cancel</button>
+                            </div>
+                            
+                            <form id="form-edit-profile">
+                                <div class="form-field">
+                                    <label for="edit-profile-name">Full Name *</label>
+                                    <input type="text" id="edit-profile-name" required>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="edit-profile-account-type">Account Type</label>
+                                    <select id="edit-profile-account-type">
+                                        <option value="Buyer / Seller">Buyer / Seller (Individual)</option>
+                                        <option value="Real Estate Agent / Realtor">Real Estate Agent / Realtor</option>
+                                        <option value="Property Owner / Developer">Property Owner / Developer</option>
+                                        <option value="Agency Representative">Agency Representative</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="edit-profile-nid">National ID (NID) *</label>
+                                    <input type="text" id="edit-profile-nid" placeholder="Enter National ID" required>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="edit-profile-phone">Phone Number *</label>
+                                    <input type="text" id="edit-profile-phone" placeholder="017XXXXXXXX" required>
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="edit-profile-company">Company / Agency</label>
+                                    <input type="text" id="edit-profile-company" placeholder="e.g. Apex Realty or Individual">
+                                </div>
+
+                                <div class="form-field">
+                                    <label for="edit-profile-facebook">Facebook Profile / Website (Optional)</label>
+                                    <input type="url" id="edit-profile-facebook" placeholder="https://facebook.com/username">
+                                </div>
+
+                                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                                    <button type="button" class="btn btn-secondary w-full" onclick="toggleProfileEdit(false)">Cancel</button>
+                                    <button type="submit" class="btn btn-primary w-full" id="btn-save-profile">💾 Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Trust & Verification Info Card -->
+                        <div class="profile-card" style="margin-top: 20px; background: var(--color-brand-soft); border-color: rgba(15,118,110,0.2);">
+                            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                                <div style="font-size: 1.4rem;">🛡️</div>
+                                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--color-text);">
+                                    <strong style="display: block; margin-bottom: 2px; color: var(--color-brand);">Trust & Identity Protection</strong>
+                                    Your National ID and deeds are verified directly by EstateLink Administrators. Once verified, your property listings are awarded verified status and highlighted to buyers.
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT COLUMN: User's Posted Properties / Submissions Section -->
+                    <div class="profile-submissions-col">
+                        <div class="submissions-header-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                                <div>
+                                    <h3 style="font-size: 1.25rem; font-weight: 800;">My Property Posts & Verification Status</h3>
+                                    <p style="font-size: 0.85rem; color: var(--color-text-muted);">Monitor admin acceptance, audit feedback, and rejection notes in real-time.</p>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="navigateTo('/sell-property')">
+                                    + List New Property
+                                </button>
+                            </div>
+
+                            <!-- Submissions Stats Counter -->
+                            <div class="profile-stats-grid">
+                                <div class="profile-stat-box" onclick="filterProfileProperties('all')" style="cursor: pointer;">
+                                    <div class="profile-stat-val" id="prof-stat-total" style="color: var(--color-brand);">0</div>
+                                    <div class="profile-stat-lbl">Total Posts</div>
+                                </div>
+                                <div class="profile-stat-box stat-approved" onclick="filterProfileProperties('approved')" style="cursor: pointer;">
+                                    <div class="profile-stat-val" id="prof-stat-approved" style="color: var(--color-success);">0</div>
+                                    <div class="profile-stat-lbl">✓ Approved</div>
+                                </div>
+                                <div class="profile-stat-box stat-pending" onclick="filterProfileProperties('pending')" style="cursor: pointer;">
+                                    <div class="profile-stat-val" id="prof-stat-pending" style="color: var(--color-warning);">0</div>
+                                    <div class="profile-stat-lbl">⏳ Pending Review</div>
+                                </div>
+                                <div class="profile-stat-box stat-rejected" onclick="filterProfileProperties('rejected')" style="cursor: pointer;">
+                                    <div class="profile-stat-val" id="prof-stat-rejected" style="color: var(--color-danger);">0</div>
+                                    <div class="profile-stat-lbl">❌ Rejected</div>
+                                </div>
+                            </div>
+
+                            <!-- Filter Tabs for Submissions -->
+                            <div class="submission-filter-tabs">
+                                <button class="sub-tab-btn active" id="prof-tab-all" onclick="filterProfileProperties('all')">All Posts (<span id="count-prof-all">0</span>)</button>
+                                <button class="sub-tab-btn" id="prof-tab-approved" onclick="filterProfileProperties('approved')">✓ Approved (<span id="count-prof-approved">0</span>)</button>
+                                <button class="sub-tab-btn" id="prof-tab-pending" onclick="filterProfileProperties('pending')">⏳ Pending Review (<span id="count-prof-pending">0</span>)</button>
+                                <button class="sub-tab-btn" id="prof-tab-rejected" onclick="filterProfileProperties('rejected')">❌ Rejected / Needs Fix (<span id="count-prof-rejected">0</span>)</button>
+                            </div>
+                        </div>
+
+                        <!-- List Container for Profile Posts -->
+                        <div id="profile-properties-container" style="margin-top: 16px;">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>

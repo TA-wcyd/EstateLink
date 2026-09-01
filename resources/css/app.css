@@ -1307,3 +1307,302 @@ button, input, select, textarea {
 .toast-message.success {
   border-left-color: #10b981;
 }
+
+/* ==========================================================================
+   Profile Page & Submissions Section Styles
+   ========================================================================== */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  transition: var(--transition);
+}
+
+.profile-card-header {
+  text-align: center;
+}
+
+.profile-avatar-large {
+  width: 84px;
+  height: 84px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--color-brand), #0d9488);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 auto 14px;
+  box-shadow: 0 8px 20px -4px rgba(15, 118, 110, 0.35);
+  border: 3px solid var(--color-surface);
+}
+
+.profile-avatar-large.avatar-admin {
+  background: linear-gradient(135deg, var(--color-admin), #4f46e5);
+  box-shadow: 0 8px 20px -4px rgba(99, 102, 241, 0.35);
+}
+
+.profile-name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+  color: var(--color-text);
+}
+
+.profile-email {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.profile-divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 20px 0;
+}
+
+.profile-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  background-color: var(--color-input);
+  border-radius: var(--radius-md);
+}
+
+.detail-label {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: right;
+  word-break: break-word;
+}
+
+.submissions-header-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-card);
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 640px) {
+  .profile-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.profile-stat-box {
+  background-color: var(--color-input);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  text-align: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.profile-stat-box:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-brand);
+}
+
+.profile-stat-val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.profile-stat-lbl {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.submission-filter-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sub-tab-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.sub-tab-btn:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.sub-tab-btn.active {
+  background-color: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #ffffff;
+}
+
+/* Individual Property Submission Card on Profile Page */
+.profile-prop-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 20px;
+  align-items: center;
+  transition: var(--transition);
+}
+
+@media (max-width: 900px) {
+  .profile-prop-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-prop-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background-color: #0f172a;
+}
+
+.profile-prop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-prop-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.profile-prop-price {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-brand);
+}
+
+.profile-prop-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Admin Message & Status Callout Banners */
+.admin-status-banner {
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 0.88rem;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.banner-approved {
+  background-color: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #065f46;
+}
+
+[data-theme="dark"] .banner-approved {
+  background-color: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+}
+
+.banner-pending {
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #92400e;
+}
+
+[data-theme="dark"] .banner-pending {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+.banner-rejected {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+}
+
+[data-theme="dark"] .banner-rejected {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.admin-rejection-content {
+  margin-top: 4px;
+  padding: 10px 14px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #ef4444;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #7f1d1d;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .admin-rejection-content {
+  background-color: rgba(15, 23, 42, 0.6);
+  color: #fca5a5;
+}
+
+.profile-prop-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 140px;
+}
+
