@@ -522,11 +522,15 @@ window.handlePropertyTypeChange = function () {
   }
 };
 
-window.handleImageSelection = function (event) {
-  const files = Array.from(event.target.files);
+window.addSelectedImages = function (fileList) {
+  const files = Array.from(fileList);
   if (!files.length) return;
 
   const validFiles = files.filter(file => {
+    if (!file.type.startsWith('image/')) {
+      showToast(`File "${file.name}" is not a recognized image.`, 'error');
+      return false;
+    }
     if (file.size > 20 * 1024 * 1024) {
       showToast(`Image "${file.name}" exceeds 20MB limit.`, 'error');
       return false;
@@ -534,8 +538,16 @@ window.handleImageSelection = function (event) {
     return true;
   });
 
-  state.sellForm.selectedImages.push(...validFiles);
-  renderImagePreviews();
+  if (validFiles.length > 0) {
+    state.sellForm.selectedImages.push(...validFiles);
+    renderImagePreviews();
+  }
+};
+
+window.handleImageSelection = function (event) {
+  if (event.target.files) {
+    addSelectedImages(event.target.files);
+  }
   event.target.value = '';
 };
 
@@ -566,7 +578,7 @@ function renderImagePreviews() {
     const isPrimary = (state.sellForm.existingImages.length === 0 && idx === 0);
 
     item.innerHTML = `
-      <img src="${objectUrl}" class="preview-img">
+      <img src="${objectUrl}" class="preview-img" alt="${escapeHtml(file.name)}">
       <button type="button" class="preview-remove-btn" onclick="removeSelectedImage(${idx})">&times;</button>
       ${isPrimary ? '<span class="preview-primary-badge">PRIMARY COVER</span>' : ''}
     `;
@@ -599,13 +611,11 @@ window.removeExistingImage = async function (imageId) {
   }
 };
 
-window.handleDocSelection = function (event, type) {
-  const file = event.target.files[0];
+window.handleDocFile = function (file, type) {
   if (!file) return;
 
   if (file.size > 20 * 1024 * 1024) {
     showToast(`Document "${file.name}" exceeds 20MB limit.`, 'error');
-    event.target.value = '';
     return;
   }
 
@@ -621,6 +631,13 @@ window.handleDocSelection = function (event, type) {
     const statusBox = document.getElementById('prop-file-status');
     if (nameEl) nameEl.textContent = `📑 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
     if (statusBox) statusBox.style.display = 'flex';
+  }
+};
+
+window.handleDocSelection = function (event, type) {
+  const file = event.target.files && event.target.files[0];
+  if (file) {
+    handleDocFile(file, type);
   }
 };
 
@@ -1073,24 +1090,29 @@ window.openAdminReviewModal = async function (id) {
           </div>
         ` : `
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            ${docs.map(d => `
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); flex-wrap: wrap; gap: 8px;">
-                <div>
-                  <span style="font-weight: 700; text-transform: uppercase; font-size: 0.75rem; background: var(--color-brand-soft); color: var(--color-brand); padding: 2px 8px; border-radius: 4px; margin-right: 6px;">
-                    ${d.document_type}
-                  </span>
-                  <span style="font-size: 0.9rem; font-weight: 600;">${escapeHtml(d.original_name)}</span>
+            ${docs.map((d, index) => {
+              const token = state.token || localStorage.getItem('estatelink_token') || '';
+              const viewUrl = `/api/admin/properties/${p.id}/documents/${d.id}/download?view=1&token=${encodeURIComponent(token)}`;
+              const safeName = escapeHtml(d.original_name);
+              return `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); flex-wrap: wrap; gap: 8px;">
+                  <div>
+                    <span style="font-weight: 700; text-transform: uppercase; font-size: 0.75rem; background: var(--color-brand-soft); color: var(--color-brand); padding: 2px 8px; border-radius: 4px; margin-right: 6px;">
+                      ${escapeHtml(d.document_type)}
+                    </span>
+                    <span style="font-size: 0.9rem; font-weight: 600;">${safeName}</span>
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <a href="${viewUrl}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                      👁️ View Document
+                    </a>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="downloadAdminDocument(${p.id}, ${d.id})" style="display: inline-flex; align-items: center; gap: 4px;">
+                      📥 Download
+                    </button>
+                  </div>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="viewAdminDocument(${p.id}, ${d.id}, '${escapeHtml(d.original_name)}')">
-                    👁️ View Document
-                  </button>
-                  <button type="button" class="btn btn-primary btn-sm" onclick="downloadAdminDocument(${p.id}, ${d.id}, '${escapeHtml(d.original_name)}')">
-                    📥 Download
-                  </button>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         `}
       </div>
@@ -1136,49 +1158,54 @@ window.openAdminReviewModal = async function (id) {
   }
 };
 
-/* Secure Admin Document Viewing / Downloading with Bearer Token */
-window.viewAdminDocument = async function (propertyId, documentId, filename) {
-  try {
-    showToast('Loading document for viewing...', 'info');
-    const response = await fetch(`/api/admin/properties/${propertyId}/documents/${documentId}/download?view=1`, {
-      headers: {
-        'Authorization': `Bearer ${state.token}`
-      }
-    });
-
-    if (!response.ok) throw new Error('Unable to view document');
-
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, '_blank');
-  } catch (err) {
-    showToast('Failed to open document preview.', 'error');
-  }
+/* Secure Admin Document Viewing / Downloading with Bearer Token & Fallback */
+window.viewAdminDocument = function (propertyId, documentId) {
+  const token = state.token || localStorage.getItem('estatelink_token') || '';
+  const url = `/api/admin/properties/${propertyId}/documents/${documentId}/download?view=1&token=${encodeURIComponent(token)}`;
+  window.open(url, '_blank');
 };
 
-window.downloadAdminDocument = async function (propertyId, documentId, filename) {
+window.downloadAdminDocument = async function (propertyId, documentId, optionalFilename) {
   try {
     showToast('Downloading document...', 'info');
-    const response = await fetch(`/api/admin/properties/${propertyId}/documents/${documentId}/download`, {
+    const token = state.token || localStorage.getItem('estatelink_token') || '';
+    const downloadUrl = `/api/admin/properties/${propertyId}/documents/${documentId}/download?token=${encodeURIComponent(token)}`;
+
+    const response = await fetch(downloadUrl, {
       headers: {
-        'Authorization': `Bearer ${state.token}`
+        'Authorization': `Bearer ${token}`
       }
     });
 
-    if (!response.ok) throw new Error('Unable to download document');
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `Download failed (HTTP ${response.status})`);
+    }
+
+    // Try to extract original filename from Content-Disposition header
+    let filename = optionalFilename;
+    const disposition = response.headers.get('content-disposition');
+    if (!filename && disposition && disposition.indexOf('filename=') !== -1) {
+      const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+      const matches = filenameRegex.exec(disposition);
+      if (matches != null && matches[1]) {
+        filename = matches[1].replace(/['"]/g, '');
+      }
+    }
 
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = filename || 'document';
+    link.download = filename || `document_${documentId}.pdf`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
     showToast('Document downloaded successfully!', 'success');
   } catch (err) {
-    showToast('Failed to download document.', 'error');
+    console.error('Download error:', err);
+    showToast(err.message || 'Failed to download document.', 'error');
   }
 };
 
@@ -1729,10 +1756,95 @@ function renderProfileSubmissionsList() {
   container.innerHTML = html;
 }
 
+function setupDropzones() {
+  // Photos dropzone
+  const imgZone = document.getElementById('images-dropzone');
+  if (imgZone) {
+    ['dragenter', 'dragover'].forEach(name => {
+      imgZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imgZone.style.borderColor = 'var(--color-brand)';
+        imgZone.style.backgroundColor = 'rgba(99, 102, 241, 0.08)';
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      imgZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imgZone.style.borderColor = '';
+        imgZone.style.backgroundColor = '';
+      });
+    });
+
+    imgZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files) {
+        addSelectedImages(e.dataTransfer.files);
+      }
+    });
+  }
+
+  // NID document dropzone
+  const nidZone = document.getElementById('nid-dropzone');
+  if (nidZone) {
+    ['dragenter', 'dragover'].forEach(name => {
+      nidZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        nidZone.style.borderColor = 'var(--color-brand)';
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      nidZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        nidZone.style.borderColor = '';
+      });
+    });
+
+    nidZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleDocFile(e.dataTransfer.files[0], 'nid');
+      }
+    });
+  }
+
+  // Ownership document dropzone
+  const propZone = document.getElementById('prop-doc-dropzone');
+  if (propZone) {
+    ['dragenter', 'dragover'].forEach(name => {
+      propZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        propZone.style.borderColor = 'var(--color-brand)';
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      propZone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        propZone.style.borderColor = '';
+      });
+    });
+
+    propZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleDocFile(e.dataTransfer.files[0], 'prop');
+      }
+    });
+  }
+}
+
 /* ==========================================================================
    Event Bindings & Form Handlers
    ========================================================================== */
 function bindEventHandlers() {
+  // Initialize drag & drop zones
+  setupDropzones();
+
   // Theme toggle button
   document.getElementById('theme-toggle-btn')?.addEventListener('click', toggleTheme);
 
