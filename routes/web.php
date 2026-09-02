@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -11,6 +12,14 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// Public storage asset streaming fallback
+Route::get('/storage/{path}', function (string $path) {
+    if (!Storage::disk('public')->exists($path)) {
+        abort(404);
+    }
+    return Storage::disk('public')->response($path);
+})->where('path', '.*');
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -19,3 +28,4 @@ Route::get('/', function () {
 Route::get('/{any}', function () {
     return view('welcome');
 })->where('any', 'properties.*|properties|sell-property|my-properties|profile|admin.*');
+

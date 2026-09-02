@@ -354,9 +354,9 @@
                             <div class="form-row">
                                 <div class="form-field">
                                     <label>Seller National ID (NID) Scan / Photo *</label>
-                                    <div class="upload-dropzone" style="padding: 16px;" onclick="document.getElementById('input-nid-doc').click()">
+                                    <div class="upload-dropzone" id="nid-dropzone" style="padding: 16px;" onclick="document.getElementById('input-nid-doc').click()">
                                         <div style="font-size: 1.4rem;">🪪</div>
-                                        <span style="font-size: 0.85rem; font-weight: 600;">Choose NID Document</span>
+                                        <span style="font-size: 0.85rem; font-weight: 600;">Choose NID Document (or Drag & Drop)</span>
                                         <input type="file" id="input-nid-doc" accept="image/*,.pdf" style="display: none;" onchange="handleDocSelection(event, 'nid')">
                                     </div>
                                     <div id="nid-file-status" class="file-selected-card" style="display: none;">
@@ -367,9 +367,9 @@
 
                                 <div class="form-field">
                                     <label>Property Ownership Deed / Mutation Proof *</label>
-                                    <div class="upload-dropzone" style="padding: 16px;" onclick="document.getElementById('input-prop-doc').click()">
+                                    <div class="upload-dropzone" id="prop-doc-dropzone" style="padding: 16px;" onclick="document.getElementById('input-prop-doc').click()">
                                         <div style="font-size: 1.4rem;">📑</div>
-                                        <span style="font-size: 0.85rem; font-weight: 600;">Choose Ownership Document</span>
+                                        <span style="font-size: 0.85rem; font-weight: 600;">Choose Ownership Document (or Drag & Drop)</span>
                                         <input type="file" id="input-prop-doc" accept="image/*,.pdf" style="display: none;" onchange="handleDocSelection(event, 'prop')">
                                     </div>
                                     <div id="prop-file-status" class="file-selected-card" style="display: none;">

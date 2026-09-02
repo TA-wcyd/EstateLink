@@ -130,16 +130,22 @@ class AdminPropertyController extends Controller
             );
         }
 
+        $headers = [
+            'Access-Control-Expose-Headers' => 'Content-Disposition',
+        ];
+
         if ($request->query('view') === '1' || $request->query('inline') === '1') {
             return Storage::disk('local')->response(
                 $document->document_path,
-                $document->original_name
+                $document->original_name,
+                $headers
             );
         }
 
         return Storage::disk('local')->download(
             $document->document_path,
-            $document->original_name
+            $document->original_name,
+            $headers
         );
     }
 
