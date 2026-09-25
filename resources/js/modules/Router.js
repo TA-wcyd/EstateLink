@@ -21,7 +21,21 @@ export class Router {
 
   static handleRoute(path) {
     state.currentRoute = path;
-    
+
+    // If leaving the compare page, clear the selection state so cards reset
+    if (!path.startsWith('/compare') && !path.startsWith('/properties/compare')) {
+      if (window.clearCompareState) window.clearCompareState();
+    }
+
+    // Property comparison link /compare or /properties/compare
+    if (path.startsWith('/compare') || path.startsWith('/properties/compare')) {
+      Router.showView('view-compare');
+      if (window.loadComparisonPage) window.loadComparisonPage();
+      Router.updateNavActiveState('/compare');
+      if (window.updateFloatingDock) window.updateFloatingDock();
+      return;
+    }
+
     // Direct property link /properties/:id
     if (path.startsWith('/properties/')) {
       const id = path.split('/')[2];
@@ -41,6 +55,12 @@ export class Router {
       case '/properties':
         Router.showView('view-properties');
         if (window.loadPublicProperties) window.loadPublicProperties(1);
+        break;
+
+      case '/compare':
+      case '/properties/compare':
+        Router.showView('view-compare');
+        if (window.loadComparisonPage) window.loadComparisonPage();
         break;
 
       case '/sell-property':
@@ -113,6 +133,7 @@ export class Router {
       case '/':
       default:
         Router.showView('view-home');
+        if (window.loadHomeFeaturedProperties) window.loadHomeFeaturedProperties();
         break;
     }
   }
@@ -131,6 +152,7 @@ export class Router {
   static updateNavActiveState(path) {
     document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
     if (path === '/') document.getElementById('nav-link-home')?.classList.add('active');
+    else if (path.startsWith('/compare')) document.getElementById('nav-link-compare')?.classList.add('active');
     else if (path.startsWith('/properties')) document.getElementById('nav-link-properties')?.classList.add('active');
     else if (path === '/sell-property') document.getElementById('nav-link-sell')?.classList.add('active');
     else if (path === '/my-properties') document.getElementById('nav-link-my-properties')?.classList.add('active');

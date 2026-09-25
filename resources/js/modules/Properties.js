@@ -130,9 +130,14 @@ export class PropertiesManager {
                     ${p.seller?.company_name ? `<div style="font-size: 0.72rem; color: var(--color-text-muted);">${escapeHtml(p.seller.company_name)}</div>` : ''}
                   </div>
                 </div>
-                <button class="btn btn-sm ${isLiveAuction ? 'btn-bid-now' : 'btn-primary'}" onclick="openPropertyDetailModal(${p.id})">
-                  ${isLiveAuction ? '⚡ Bid Now' : 'View Details'}
-                </button>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <button type="button" class="btn btn-sm btn-secondary btn-compare-toggle ${window.isInCompare && window.isInCompare(p.id) ? 'active' : ''}" data-property-id="${p.id}" onclick="event.stopPropagation(); window.toggleCompare(${p.id})">
+                    ${window.isInCompare && window.isInCompare(p.id) ? '✓ Compared' : '+ Compare'}
+                  </button>
+                  <button class="btn btn-sm ${isLiveAuction ? 'btn-bid-now' : 'btn-primary'}" onclick="openPropertyDetailModal(${p.id})">
+                    ${isLiveAuction ? '⚡ Bid Now' : 'View Details'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -268,7 +273,10 @@ export class PropertiesManager {
             </div>
           </div>
 
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn btn-secondary btn-compare-toggle ${window.isInCompare && window.isInCompare(p.id) ? 'active' : ''}" data-property-id="${p.id}" onclick="window.toggleCompare(${p.id}); this.classList.toggle('active'); this.innerHTML = window.isInCompare(${p.id}) ? '✓ Compared' : '+ Compare';">
+              ${window.isInCompare && window.isInCompare(p.id) ? '✓ Compared' : '+ Compare'}
+            </button>
             ${(state.user && state.user.id !== p.user_id && (p.transaction_status === 'available' || !p.transaction_status)) ? `
               <button class="btn btn-primary" onclick="openPurchaseRequestModal(${p.id}, '${escapeHtml(p.title).replace(/'/g, "\\'")}', ${p.price}, '${escapeHtml(p.location).replace(/'/g, "\\'")}')">
                 📝 Request Purchase / Inspection
@@ -304,6 +312,67 @@ export class PropertiesManager {
 
     } catch (error) {
       console.error('Property detail error:', error);
+    }
+  }
+
+  static async loadHomeFeaturedProperties() {
+    const container = document.getElementById('home-featured-properties-container');
+    if (!container) return;
+
+    try {
+      const response = await fetch('/api/properties?per_page=6', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!response.ok) return;
+      const result = await response.json();
+      const properties = result.data || [];
+      if (properties.length === 0) return;
+
+      let html = '<div class="properties-grid">';
+      properties.forEach(p => {
+        const fallbackImage = '/images/hero_building.jpg';
+        const imageUrl = p.main_image || fallbackImage;
+        const formattedPrice = formatCurrency(p.price);
+        const statusLabel = (p.transaction_status || 'available').replace(/_/g, ' ');
+        const auction = p.live_auction;
+        const isLiveAuction = auction && auction.is_active;
+
+        html += `
+          <div class="property-card${isLiveAuction ? ' card--live-auction' : ''}">
+            <div class="card-image-wrap">
+              <img src="${imageUrl}" alt="${escapeHtml(p.title)}" class="card-image" onerror="this.src='${fallbackImage}'">
+              <div class="card-badges">
+                <span class="status-chip chip-type">${escapeHtml(p.property_type)}</span>
+                <span class="status-chip chip-${p.transaction_status || 'available'}">${escapeHtml(statusLabel)}</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="card-price">${formattedPrice}</div>
+              <h3 class="card-title" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</h3>
+              <div class="card-location">📍 ${escapeHtml(p.location)}</div>
+              <div class="card-specs">
+                <span class="spec-item">📐 ${p.size} sqft</span>
+                ${p.bedrooms !== null ? `<span class="spec-item">🛏️ ${p.bedrooms} Beds</span>` : ''}
+                ${p.bathrooms !== null ? `<span class="spec-item">🚿 ${p.bathrooms} Baths</span>` : ''}
+              </div>
+              <div class="card-footer">
+                <div style="display: flex; gap: 6px; align-items: center; width: 100%; justify-content: space-between;">
+                  <button type="button" class="btn btn-sm btn-secondary btn-compare-toggle ${window.isInCompare && window.isInCompare(p.id) ? 'active' : ''}" data-property-id="${p.id}" onclick="event.stopPropagation(); window.toggleCompare(${p.id})">
+                    ${window.isInCompare && window.isInCompare(p.id) ? '✓ Compared' : '+ Compare'}
+                  </button>
+                  <button class="btn btn-sm ${isLiveAuction ? 'btn-bid-now' : 'btn-primary'}" onclick="openPropertyDetailModal(${p.id})">
+                    ${isLiveAuction ? '⚡ Bid Now' : 'View Details'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      console.warn('Unable to load home featured properties:', e);
     }
   }
 }
