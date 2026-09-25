@@ -120,4 +120,44 @@ class Property extends Model
     {
         return $this->verification_status === 'pending';
     }
+
+    /**
+     * All bidding requests associated with this property.
+     */
+    public function biddingRequests(): HasMany
+    {
+        return $this->hasMany(BiddingRequest::class);
+    }
+
+    /**
+     * Latest pending bidding request, if any.
+     */
+    public function pendingBiddingRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BiddingRequest::class)->where('status', 'pending')->latest();
+    }
+
+    /**
+     * All auctions for this property.
+     */
+    public function auctions(): HasMany
+    {
+        return $this->hasMany(Auction::class);
+    }
+
+    /**
+     * Current active auction, if any.
+     */
+    public function activeAuction(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Auction::class)->whereIn('status', ['active', 'awaiting_seller_confirmation'])->latest();
+    }
+
+    /**
+     * Property sale record upon deal completion.
+     */
+    public function sales(): HasMany
+    {
+        return $this->hasMany(PropertySale::class);
+    }
 }

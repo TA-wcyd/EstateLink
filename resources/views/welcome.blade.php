@@ -46,6 +46,9 @@
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-my-properties" onclick="navigateTo('/my-properties')" style="display: none;">
                         My Listings
                     </a>
+                    <a href="javascript:void(0)" class="nav-link" id="nav-link-my-bids" onclick="navigateTo('/my-bids')" style="display: none;">
+                        🎯 My Bids
+                    </a>
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-profile" onclick="navigateTo('/profile')" style="display: none;">
                         👤 Profile & Submissions
                     </a>
@@ -441,20 +444,38 @@
             </div>
 
             <!-- ===============================================================
-                 VIEW 5: ADMIN VERIFICATION QUEUE (/admin/properties)
+                 VIEW 5: BUYER BIDS & PARTICIPATED AUCTIONS (/my-bids)
+                 =============================================================== -->
+            <div id="view-my-bids" class="app-view">
+                <div class="page-header">
+                    <div class="pill-tag"><span>🎯</span><span>Live Auction Portfolio</span></div>
+                    <h2 class="page-title">My Live Bids & Auction Activity</h2>
+                    <p class="page-subtitle">Track your placed bids, real-time status badges (Winning / Outbid / Won / Lost), and property auction settlements.</p>
+                </div>
+
+                <div id="my-bids-list-container">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- ===============================================================
+                 VIEW 6: ADMIN VERIFICATION & AUCTION QUEUE (/admin/properties)
                  =============================================================== -->
             <div id="view-admin-properties" class="app-view">
                 <div class="page-header">
                     <div class="pill-tag" style="background-color: var(--color-admin-soft); color: var(--color-admin);">
                         <span>🛡️</span><span>Admin Management</span>
                     </div>
-                    <h2 class="page-title">Property Verification Dashboard</h2>
-                    <p class="page-subtitle">Audit submitted properties, verify seller NID and ownership deeds, and approve or reject listings.</p>
+                    <h2 class="page-title">Admin Auditing & Auction Dashboard</h2>
+                    <p class="page-subtitle">Audit submitted properties, verify seller NID and ownership deeds, and approve or reject live bidding requests.</p>
                 </div>
 
                 <div class="admin-tab-bar">
                     <button class="btn btn-sm btn-primary" id="btn-admin-tab-pending" onclick="loadAdminQueue('pending')">
-                        ⏳ Pending Approval Queue (<span id="admin-pending-count">0</span>)
+                        ⏳ Pending Properties (<span id="admin-pending-count">0</span>)
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="btn-admin-tab-bidding" onclick="loadAdminQueue('bidding_requests')">
+                        🏛️ Bidding Requests (<span id="admin-bidding-count">0</span>)
                     </button>
                     <button class="btn btn-sm btn-secondary" id="btn-admin-tab-all" onclick="loadAdminQueue('all')">
                         📋 All Properties History
@@ -602,41 +623,43 @@
 
                     </div>
 
-                    <!-- RIGHT COLUMN: User's Posted Properties / Submissions Section -->
+                    <!-- RIGHT COLUMN: User's Posted Properties / Submissions Section / Admin Command Center -->
                     <div class="profile-submissions-col">
                         <div class="submissions-header-card">
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
                                 <div>
-                                    <h3 style="font-size: 1.25rem; font-weight: 800;">My Property Posts & Verification Status</h3>
-                                    <p style="font-size: 0.85rem; color: var(--color-text-muted);">Monitor admin acceptance, audit feedback, and rejection notes in real-time.</p>
+                                    <h3 style="font-size: 1.25rem; font-weight: 800;" id="prof-col-title">My Property Posts & Verification Status</h3>
+                                    <p style="font-size: 0.85rem; color: var(--color-text-muted);" id="prof-col-subtitle">Monitor admin acceptance, audit feedback, and rejection notes in real-time.</p>
                                 </div>
-                                <button class="btn btn-primary btn-sm" onclick="navigateTo('/sell-property')">
-                                    + List New Property
-                                </button>
+                                <div id="prof-header-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary btn-sm" onclick="navigateTo('/sell-property')">
+                                        + List New Property
+                                    </button>
+                                </div>
                             </div>
 
-                            <!-- Submissions Stats Counter -->
-                            <div class="profile-stats-grid">
+                            <!-- Submissions / Admin Stats Counter -->
+                            <div class="profile-stats-grid" id="prof-stats-grid">
                                 <div class="profile-stat-box" onclick="filterProfileProperties('all')" style="cursor: pointer;">
                                     <div class="profile-stat-val" id="prof-stat-total" style="color: var(--color-brand);">0</div>
-                                    <div class="profile-stat-lbl">Total Posts</div>
+                                    <div class="profile-stat-lbl" id="prof-lbl-total">Total Posts</div>
                                 </div>
                                 <div class="profile-stat-box stat-approved" onclick="filterProfileProperties('approved')" style="cursor: pointer;">
                                     <div class="profile-stat-val" id="prof-stat-approved" style="color: var(--color-success);">0</div>
-                                    <div class="profile-stat-lbl">✓ Approved</div>
+                                    <div class="profile-stat-lbl" id="prof-lbl-approved">✓ Approved</div>
                                 </div>
                                 <div class="profile-stat-box stat-pending" onclick="filterProfileProperties('pending')" style="cursor: pointer;">
                                     <div class="profile-stat-val" id="prof-stat-pending" style="color: var(--color-warning);">0</div>
-                                    <div class="profile-stat-lbl">⏳ Pending Review</div>
+                                    <div class="profile-stat-lbl" id="prof-lbl-pending">⏳ Pending Review</div>
                                 </div>
                                 <div class="profile-stat-box stat-rejected" onclick="filterProfileProperties('rejected')" style="cursor: pointer;">
                                     <div class="profile-stat-val" id="prof-stat-rejected" style="color: var(--color-danger);">0</div>
-                                    <div class="profile-stat-lbl">❌ Rejected</div>
+                                    <div class="profile-stat-lbl" id="prof-lbl-rejected">❌ Rejected</div>
                                 </div>
                             </div>
 
-                            <!-- Filter Tabs for Submissions -->
-                            <div class="submission-filter-tabs">
+                            <!-- Filter Tabs for Submissions / Admin Tabs -->
+                            <div class="submission-filter-tabs" id="prof-tabs-wrap">
                                 <button class="sub-tab-btn active" id="prof-tab-all" onclick="filterProfileProperties('all')">All Posts (<span id="count-prof-all">0</span>)</button>
                                 <button class="sub-tab-btn" id="prof-tab-approved" onclick="filterProfileProperties('approved')">✓ Approved (<span id="count-prof-approved">0</span>)</button>
                                 <button class="sub-tab-btn" id="prof-tab-pending" onclick="filterProfileProperties('pending')">⏳ Pending Review (<span id="count-prof-pending">0</span>)</button>
@@ -644,10 +667,11 @@
                             </div>
                         </div>
 
-                        <!-- List Container for Profile Posts -->
+                        <!-- List Container for Profile Posts / Admin Queue Items -->
                         <div id="profile-properties-container" style="margin-top: 16px;">
                             <!-- Populated dynamically via JS -->
                         </div>
+                        <div id="profile-pagination-container" class="pagination-wrap"></div>
                     </div>
                 </div>
             </div>
@@ -829,6 +853,78 @@
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
                     <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
                     <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 6. Seller Request Live Bidding / Auction Modal -->
+    <div class="modal-backdrop" id="modal-bidding-request">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">🚀 Request Live Property Auction</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-bidding-request" onsubmit="handleBiddingRequestSubmit(event)">
+                <input type="hidden" id="bidding-property-id" value="">
+                
+                <div style="background: var(--color-brand-soft); border: 1px solid var(--color-brand); border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px; font-size: 0.88rem;">
+                    💡 <strong>EstateLink Live Auction Policy:</strong>
+                    Sellers can open an auction once approved by admin. During the active window, genuine verified buyers place competitive bids with strict incremental validation.
+                </div>
+
+                <div class="form-field">
+                    <label for="bidding-start-price">Auction Opening / Reserve Price (BDT ৳) *</label>
+                    <input type="number" id="bidding-start-price" min="0.01" step="any" placeholder="Enter any opening price (e.g. 15000000 or 50000)" required>
+                    <span style="font-size: 0.8rem; color: var(--color-text-muted);">The initial floor price for the first qualifying bid (any flexible amount).</span>
+                </div>
+
+                <div class="form-field">
+                    <label for="bidding-min-increment">Minimum Increment Per Bid (BDT ৳) *</label>
+                    <input type="number" id="bidding-min-increment" min="0.01" step="any" placeholder="Enter minimum increment (e.g. 50000 or 1000)" value="50000" required>
+                    <span style="font-size: 0.8rem; color: var(--color-text-muted);">Each subsequent bid must exceed the top bid by at least this amount.</span>
+                </div>
+
+                <div class="form-field">
+                    <label for="bidding-duration-hours">Auction Duration *</label>
+                    <select id="bidding-duration-hours" required>
+                        <option value="1">1 Hour (Flash Auction)</option>
+                        <option value="6">6 Hours</option>
+                        <option value="12">12 Hours</option>
+                        <option value="24" selected>24 Hours (1 Day)</option>
+                        <option value="48">48 Hours (2 Days)</option>
+                        <option value="72">72 Hours (3 Days)</option>
+                        <option value="168">7 Days (1 Week)</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-bidding-request">Submit Request for Admin Approval</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 7. Admin Bidding Request Rejection Modal -->
+    <div class="modal-backdrop" id="modal-admin-bidding-reject">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem; color: #ef4444;">Reject Live Bidding Request</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-admin-bidding-reject" onsubmit="handleAdminBiddingRejectSubmit(event)">
+                <input type="hidden" id="reject-bidding-request-id" value="">
+                <div class="form-field">
+                    <label for="admin-bidding-reject-note">Reason for Rejection *</label>
+                    <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                        Provide the seller with an explanation (e.g. starting price too high for area, reserve price unrealistic, verification issue).
+                    </p>
+                    <textarea id="admin-bidding-reject-note" placeholder="Enter reason for rejecting bidding request..." required style="min-height: 120px;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="btn-confirm-bidding-reject">Reject Request</button>
                 </div>
             </form>
         </div>

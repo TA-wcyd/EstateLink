@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Check for auction expiry every minute (standard Laravel scheduler minimum floor)
+        $schedule->command('auctions:expire')->everyMinute()->withoutOverlapping();
     }
 
     /**
