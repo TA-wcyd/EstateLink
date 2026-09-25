@@ -27,5 +27,5 @@ Route::get('/', function () {
 // SPA catch-all for frontend routes
 Route::get('/{any}', function () {
     return view('welcome');
-})->where('any', 'properties.*|properties|sell-property|my-properties|my-bids|my-requests|profile|admin.*');
+})->where('any', 'properties.*|properties|compare.*|compare|sell-property|my-properties|my-bids|my-requests|profile|admin.*');
 
