@@ -17,6 +17,7 @@ import { ProfileManager } from './modules/Profile';
 import { AdminManager } from './modules/Admin';
 import { AuctionManager } from './modules/Auction';
 import { PropertyRequestsManager } from './modules/PropertyRequests';
+import './comparator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Global Window Bindings (Ensures 100% compatibility with HTML inline events)
@@ -48,6 +49,7 @@ window.openProfileModal = () => Router.navigateTo('/profile');
 
 // Public Properties
 window.loadPublicProperties = PropertiesManager.loadPublicProperties;
+window.loadHomeFeaturedProperties = PropertiesManager.loadHomeFeaturedProperties;
 window.resetPublicFilters = PropertiesManager.resetPublicFilters;
 window.openPropertyDetailModal = PropertiesManager.openPropertyDetailModal;
 
@@ -171,4 +173,5 @@ document.addEventListener('DOMContentLoaded', () => {
   AuthManager.initAuthSession();
   bindEventHandlers();
   Router.initRouter();
+  if (window.updateFloatingDock) window.updateFloatingDock();
 });

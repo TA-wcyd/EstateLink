@@ -41,6 +41,9 @@
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-properties" onclick="navigateTo('/properties')">
                         See Properties
                     </a>
+                    <a href="javascript:void(0)" class="nav-link" id="nav-link-compare" onclick="navigateTo('/compare')">
+                        ⚖️ Compare
+                    </a>
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-sell" onclick="navigateTo('/sell-property')">
                         Sell Property
                     </a>
@@ -193,6 +196,25 @@
                         </div>
                     </div>
 
+                </div>
+
+                <!-- Featured Verified Properties Section on Home Page -->
+                <div style="margin-top: 48px; border-top: 1px solid var(--color-border); padding-top: 36px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <div class="pill-tag" style="margin-bottom: 8px;">
+                                <span>⭐</span> <span>Top Recommendations</span>
+                            </div>
+                            <h2 style="font-size: 1.6rem; font-weight: 800; color: var(--color-text); margin: 0;">Featured Verified Listings</h2>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="navigateTo('/properties')">
+                            View All Properties →
+                        </button>
+                    </div>
+
+                    <div id="home-featured-properties-container">
+                        <!-- Populated dynamically via JS -->
+                    </div>
                 </div>
             </div>
 
@@ -698,8 +720,18 @@
                 </div>
             </div>
 
+            <!-- ===============================================================
+                 VIEW 7: SIDE-BY-SIDE PROPERTY COMPARATOR (/compare)
+                 =============================================================== -->
+            <div id="view-compare" class="app-view">
+                @include('comparator.Compare')
+            </div>
+
         </div>
     </main>
+
+    <!-- Persistent Floating Comparison Dock -->
+    @include('comparator._CompareFloatingDock')
 
     <!-- Slim Footer -->
     <footer class="footer">
