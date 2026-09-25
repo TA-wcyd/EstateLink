@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AdminAuctionController;
 use App\Http\Controllers\AdminPropertyController;
+use App\Http\Controllers\AuctionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\UsersController;
@@ -24,11 +26,13 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login'])->name('login');
 
 // ─────────────────────────────────────────────
-//  Public Property Routes (no token needed)
+//  Public Property & Live Auction Polling Routes
 //  STRICT RULE: ONLY approved properties returned.
 // ─────────────────────────────────────────────
-Route::get('/properties',      [PropertyController::class, 'index']);
-Route::get('/properties/{id}', [PropertyController::class, 'show']);
+Route::get('/properties',              [PropertyController::class, 'index']);
+Route::get('/properties/{id}',         [PropertyController::class, 'show']);
+Route::get('/properties/{id}/auction', [AuctionController::class, 'showAuction']);
+Route::get('/properties/{id}/bids',    [AuctionController::class, 'showAuction']); // alias
 
 // ─────────────────────────────────────────────
 //  Protected Routes (Bearer token required)
@@ -43,7 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ─────────────────────────────────────────
     //  Seller / Property Management Endpoints
-    //  (Any authenticated normal user can list/manage their properties)
     // ─────────────────────────────────────────
     Route::post('/properties',                                  [PropertyController::class, 'store']);
     Route::get('/my-properties',                                [PropertyController::class, 'myProperties']);
@@ -53,6 +56,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/my-properties/{id}',                        [PropertyController::class, 'destroy']);
     Route::post('/my-properties/{id}/resubmit',                 [PropertyController::class, 'resubmit']);
     Route::delete('/my-properties/{id}/images/{imageId}',       [PropertyController::class, 'deleteImage']);
+
+    // ─────────────────────────────────────────
+    //  Seller Auction Requests & Lifecycle
+    // ─────────────────────────────────────────
+    Route::post('/my-properties/{id}/bidding-request',          [AuctionController::class, 'requestBidding']);
+    Route::get('/my-properties/{id}/bidding-requests',          [AuctionController::class, 'getPropertyBiddingRequests']);
+    Route::post('/auctions/{id}/accept',                        [AuctionController::class, 'acceptWinningBid']);
+    Route::post('/auctions/{id}/decline',                       [AuctionController::class, 'declineWinningBid']);
+
+    // ─────────────────────────────────────────
+    //  Buyer Bidding & History
+    // ─────────────────────────────────────────
+    Route::post('/auctions/{id}/bids',                          [AuctionController::class, 'placeBid']);
+    Route::get('/my-bids',                                      [AuctionController::class, 'myBids']);
 
     // ─────────────────────────────────────────
     //  Admin-only Routes (role = admin required)
@@ -69,6 +86,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/properties/{propertyId}/documents/{documentId}/download',            [AdminPropertyController::class, 'downloadDocument']);
         Route::post('/properties/{id}/approve',                                          [AdminPropertyController::class, 'approve']);
         Route::post('/properties/{id}/reject',                                           [AdminPropertyController::class, 'reject']);
+
+        // Auction & Bidding Request Approval Workflow
+        Route::get('/bidding-requests',                                                  [AdminAuctionController::class, 'index']);
+        Route::post('/bidding-requests/{id}/approve',                                    [AdminAuctionController::class, 'approve']);
+        Route::post('/bidding-requests/{id}/reject',                                     [AdminAuctionController::class, 'reject']);
     });
 });
 

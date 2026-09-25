@@ -633,6 +633,134 @@ button, input, select, textarea {
   pointer-events: none;
 }
 
+/* ── Live Auction Card Variants ──────────────────────────────── */
+.card--live-auction {
+  border: 2px solid rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25);
+  animation: auction-card-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes auction-card-glow {
+  0%, 100% { box-shadow: 0 4px 18px -4px rgba(239, 68, 68, 0.18), 0 0 0 0 rgba(239, 68, 68, 0.15); }
+  50%       { box-shadow: 0 4px 18px -4px rgba(239, 68, 68, 0.32), 0 0 14px 4px rgba(239, 68, 68, 0.12); }
+}
+
+/* Badge overlay pinned to bottom of card image */
+.card-live-badge {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(10, 10, 18, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ff4d4d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px 4px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Pulsing dot inside live badge */
+.live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* Auction countdown strip between image and card body */
+.card-auction-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ef4444;
+  flex-wrap: wrap;
+  min-height: 30px;
+}
+
+.card-auction-strip--ended {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
+  border-bottom-color: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+}
+
+.card-auction-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: pulse-dot 1.1s ease-in-out infinite;
+}
+
+.card-auction-strip-label {
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.card-auction-strip-timer {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 1px 7px;
+  border-radius: 9999px;
+}
+
+.card-auction-strip-bids {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* Bid Now CTA button */
+.btn-bid-now {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: none;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.btn-bid-now:hover {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  color: #fff;
+}
+
+[data-theme="dark"] .card--live-auction {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+[data-theme="dark"] .card-auction-strip {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+}
+
+[data-theme="dark"] .card-live-badge {
+  background: rgba(5, 5, 12, 0.9);
+}
+
 .status-chip {
   padding: 4px 10px;
   font-size: 0.72rem;
@@ -1604,5 +1732,229 @@ button, input, select, textarea {
   flex-direction: column;
   gap: 8px;
   min-width: 140px;
+}
+
+/* ==========================================================================
+   AUCTION & BIDDING SYSTEM STYLES
+   ========================================================================== */
+.auction-live-card {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.06), rgba(99, 102, 241, 0.08));
+  border: 2px solid var(--color-brand);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .auction-live-card {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(99, 102, 241, 0.15));
+  border-color: var(--color-brand);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.auction-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ef4444;
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-live {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.auction-countdown-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.countdown-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  text-align: center;
+  min-width: 54px;
+}
+
+.countdown-box-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--color-brand);
+  line-height: 1;
+}
+
+.countdown-box-lbl {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.auction-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.auction-metric-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.auction-metric-title {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.auction-metric-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-top: 2px;
+}
+
+.auction-bid-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.quick-bid-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px 0;
+}
+
+.btn-quick-bid {
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-quick-bid:hover {
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.auction-bids-ledger {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ledger-bid-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+}
+
+.ledger-bid-item:last-child {
+  border-bottom: none;
+}
+
+.ledger-bid-item.is-top-bid {
+  background: var(--color-brand-soft);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+}
+
+.ledger-bid-item.is-you {
+  border-left: 3px solid var(--color-brand);
+}
+
+/* Badges for Buyer Bid History */
+.badge-winning {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-weight: 700;
+}
+
+.badge-outbid {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 700;
+}
+
+.badge-won {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.badge-lost {
+  background: rgba(100, 116, 139, 0.15);
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.badge-pending {
+  background: rgba(99, 102, 241, 0.15);
+  color: #4f46e5;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  font-weight: 700;
+}
+
+.auction-history-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  transition: var(--transition);
+}
+
+@media (max-width: 768px) {
+  .auction-history-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auction-history-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
 }
 

@@ -95,4 +95,44 @@ class User extends Authenticatable
     {
         return $this->hasMany(Property::class, 'reviewed_by');
     }
+
+    /**
+     * Bidding requests submitted by this user (as a seller).
+     */
+    public function biddingRequests()
+    {
+        return $this->hasMany(BiddingRequest::class);
+    }
+
+    /**
+     * Auctions hosted by this user (as a seller).
+     */
+    public function auctions()
+    {
+        return $this->hasMany(Auction::class, 'seller_id');
+    }
+
+    /**
+     * Bids placed by this user (as a buyer).
+     */
+    public function bids()
+    {
+        return $this->hasMany(Bid::class);
+    }
+
+    /**
+     * Property sales completed as a seller.
+     */
+    public function salesAsSeller()
+    {
+        return $this->hasMany(PropertySale::class, 'seller_id');
+    }
+
+    /**
+     * Property purchases completed as a buyer.
+     */
+    public function purchasesAsBuyer()
+    {
+        return $this->hasMany(PropertySale::class, 'buyer_id');
+    }
 }

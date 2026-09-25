@@ -52,7 +52,11 @@ class PropertyController extends Controller
     {
         $query = Property::query()
             ->approved()
-            ->with(['images', 'user:id,name,phone,company_name,verification_status'])
+            ->with([
+                'images',
+                'user:id,name,phone,company_name,verification_status',
+                'activeAuction',
+            ])
             ->latest('submitted_at');
 
         // Optional filter: property_type
@@ -490,6 +494,25 @@ class PropertyController extends Controller
     {
         $primaryImg = $property->images->firstWhere('is_primary', true) ?? $property->images->first();
 
+        // Resolve active auction (eager-loaded via activeAuction relation or lazy-loaded for detail view)
+        $activeAuction = $property->relationLoaded('activeAuction')
+            ? $property->activeAuction
+            : $property->activeAuction()->first();
+
+        $liveAuction = null;
+        if ($activeAuction) {
+            $liveAuction = [
+                'id'             => $activeAuction->id,
+                'status'         => $activeAuction->status,
+                'start_price'    => (float) $activeAuction->start_price,
+                'min_increment'  => (float) $activeAuction->min_increment,
+                'end_time'       => $activeAuction->end_time?->toIso8601String(),
+                'remaining_secs' => $activeAuction->remaining_seconds,
+                'total_bids'     => $activeAuction->bids()->count(),
+                'is_active'      => $activeAuction->isActive(),
+            ];
+        }
+
         $data = [
             'id'                 => $property->id,
             'title'              => $property->title,
@@ -503,6 +526,7 @@ class PropertyController extends Controller
             'phone'              => $property->phone ?? $property->user?->phone,
             'transaction_status' => $property->transaction_status,
             'main_image'         => $primaryImg ? $primaryImg->url : null,
+            'live_auction'       => $liveAuction,
             'images'             => $property->images->map(fn($img) => [
                 'id'         => $img->id,
                 'url'        => $img->url,
