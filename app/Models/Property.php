@@ -160,4 +160,24 @@ class Property extends Model
     {
         return $this->hasMany(PropertySale::class);
     }
+
+    /**
+     * All purchase/inspection requests for this property.
+     */
+    public function requests(): HasMany
+    {
+        return $this->hasMany(PropertyRequest::class);
+    }
+
+    /**
+     * Returns the single active request currently locked in the admin pipeline, if any.
+     */
+    public function activeForwardedRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PropertyRequest::class)->whereIn('status', [
+            \App\Enums\PropertyRequestStatus::FORWARDED_TO_ADMIN->value,
+            \App\Enums\PropertyRequestStatus::SCHEDULE_FIXED->value,
+            \App\Enums\PropertyRequestStatus::INSPECTION_COMPLETED->value,
+        ]);
+    }
 }

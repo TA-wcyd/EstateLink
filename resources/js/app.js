@@ -131,6 +131,17 @@ function handleRoute(path) {
       loadMyBids();
       break;
 
+    case '/my-requests':
+      if (!state.token || !state.user) {
+        showToast('Please sign in to view your purchase requests.', 'info');
+        openAuthModal('login', 'user');
+        navigateTo('/');
+        return;
+      }
+      showView('view-my-requests');
+      loadMyRequests();
+      break;
+
     case '/profile':
       if (!state.token || !state.user) {
         showToast('Please sign in to view your profile.', 'info');
@@ -177,6 +188,7 @@ function updateNavActiveState(path) {
   else if (path === '/sell-property') document.getElementById('nav-link-sell')?.classList.add('active');
   else if (path === '/my-properties') document.getElementById('nav-link-my-properties')?.classList.add('active');
   else if (path === '/my-bids') document.getElementById('nav-link-my-bids')?.classList.add('active');
+  else if (path === '/my-requests') document.getElementById('nav-link-my-requests')?.classList.add('active');
   else if (path === '/profile') document.getElementById('nav-link-profile')?.classList.add('active');
   else if (path.startsWith('/admin')) document.getElementById('nav-link-admin-queue')?.classList.add('active');
 }
@@ -196,6 +208,7 @@ async function initAuthSession() {
   const heroUserBadge = document.getElementById('hero-user-badge');
   const heroGreeting = document.getElementById('hero-user-greeting');
   const myListingsNav = document.getElementById('nav-link-my-properties');
+  const myRequestsNav = document.getElementById('nav-link-my-requests');
   const adminQueueNav = document.getElementById('nav-link-admin-queue');
   const showcaseTag = document.getElementById('showcase-status-tag');
 
@@ -237,6 +250,7 @@ async function initAuthSession() {
     if (heroUserActions) heroUserActions.style.display = 'flex';
     if (heroGuestBadge) heroGuestBadge.style.display = 'none';
     if (myListingsNav) myListingsNav.style.display = 'inline-flex';
+    if (myRequestsNav) myRequestsNav.style.display = 'inline-flex';
     const myBidsNav = document.getElementById('nav-link-my-bids');
     if (myBidsNav) myBidsNav.style.display = 'inline-flex';
     const profileNav = document.getElementById('nav-link-profile');
@@ -268,6 +282,8 @@ async function initAuthSession() {
     if (heroGuestBadge) heroGuestBadge.style.display = 'inline-flex';
     if (heroUserBadge) heroUserBadge.style.display = 'none';
     if (myListingsNav) myListingsNav.style.display = 'none';
+    const myRequestsNav = document.getElementById('nav-link-my-requests');
+    if (myRequestsNav) myRequestsNav.style.display = 'none';
     const myBidsNav = document.getElementById('nav-link-my-bids');
     if (myBidsNav) myBidsNav.style.display = 'none';
     const profileNav = document.getElementById('nav-link-profile');
@@ -550,13 +566,22 @@ window.openPropertyDetailModal = async function (id) {
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          ${(state.user && state.user.id !== p.user_id && (p.transaction_status === 'available' || !p.transaction_status)) ? `
+            <button class="btn btn-primary" onclick="openPurchaseRequestModal(${p.id}, '${escapeHtml(p.title).replace(/'/g, "\\'")}', ${p.price}, '${escapeHtml(p.location).replace(/'/g, "\\'")}')">
+              📝 Request Purchase / Inspection
+            </button>
+          ` : (!state.user && (p.transaction_status === 'available' || !p.transaction_status) ? `
+            <button class="btn btn-primary" onclick="openAuthModal('login', 'user')">
+              Sign In to Request Purchase
+            </button>
+          ` : '')}
           ${contactPhone ? `
-            <a href="tel:${escapeHtml(contactPhone)}" class="btn btn-primary">
+            <a href="tel:${escapeHtml(contactPhone)}" class="btn btn-secondary">
               📞 Call ${escapeHtml(contactPhone)}
             </a>
           ` : `
-            <button class="btn btn-primary" onclick="showToast('Contact seller via EstateLink')">Contact Seller</button>
+            <button class="btn btn-secondary" onclick="showToast('Contact seller via EstateLink')">Contact Seller</button>
           `}
         </div>
       </div>
@@ -843,6 +868,9 @@ window.loadMyProperties = async function () {
           <div style="display: flex; flex-direction: column; gap: 8px; min-width: 140px;">
             ${p.verification_status === 'approved' ? `
               <button class="btn btn-secondary btn-sm w-full" onclick="openPropertyDetailModal(${p.id})">Public View</button>
+              <button class="btn btn-secondary btn-sm w-full" onclick="openSellerRequestsModal(${p.id}, '${escapeHtml(p.title).replace(/'/g, "\\'")}')">
+                📥 Requests / Offers
+              </button>
               ${p.transaction_status !== 'sold' ? `
                 <button class="btn btn-primary btn-sm w-full" onclick="openBiddingRequestModal(${p.id}, ${p.price})" style="background: linear-gradient(135deg, var(--color-brand), var(--color-admin)); color: #fff;">
                   🚀 Request Auction
@@ -982,8 +1010,21 @@ window.loadAdminPendingCount = async function () {
       }
       if (countSpan) countSpan.textContent = count;
     }
+
+    const inspRes = await fetch('/api/admin/requests/queue', {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+    if (inspRes.ok) {
+      const inspData = await inspRes.json();
+      const inspCount = inspData.total || (inspData.data ? inspData.data.length : 0);
+      const inspSpan = document.getElementById('admin-inspections-count');
+      if (inspSpan) inspSpan.textContent = inspCount;
+    }
   } catch (error) {
-    console.warn('Unable to load admin pending count:', error);
+    console.warn('Unable to load admin pending counts:', error);
   }
 };
 
@@ -993,6 +1034,7 @@ window.loadAdminQueue = async function (tab = 'pending', page = 1) {
   const pagination = document.getElementById('admin-pagination-container');
   const btnPending = document.getElementById('btn-admin-tab-pending');
   const btnBidding = document.getElementById('btn-admin-tab-bidding');
+  const btnInspections = document.getElementById('btn-admin-tab-inspections');
   const btnAll = document.getElementById('btn-admin-tab-all');
 
   if (!container || !state.token) return;
@@ -1001,6 +1043,8 @@ window.loadAdminQueue = async function (tab = 'pending', page = 1) {
   btnPending?.classList.add('btn-secondary');
   btnBidding?.classList.remove('btn-primary');
   btnBidding?.classList.add('btn-secondary');
+  btnInspections?.classList.remove('btn-primary');
+  btnInspections?.classList.add('btn-secondary');
   btnAll?.classList.remove('btn-primary');
   btnAll?.classList.add('btn-secondary');
 
@@ -1011,6 +1055,10 @@ window.loadAdminQueue = async function (tab = 'pending', page = 1) {
     btnBidding?.classList.remove('btn-secondary');
     btnBidding?.classList.add('btn-primary');
     return loadAdminBiddingRequests(page);
+  } else if (tab === 'inspections') {
+    btnInspections?.classList.remove('btn-secondary');
+    btnInspections?.classList.add('btn-primary');
+    return loadAdminInspectionQueue(page);
   } else {
     btnAll?.classList.remove('btn-secondary');
     btnAll?.classList.add('btn-primary');
@@ -1682,6 +1730,10 @@ async function setupAdminProfileHub() {
         <div class="profile-stat-val" id="prof-adm-stat-bidding" style="color: #6366f1;">0</div>
         <div class="profile-stat-lbl">🏛️ Bidding Requests</div>
       </div>
+      <div class="profile-stat-box" onclick="loadProfileAdminTab('inspections')" style="cursor: pointer; border-left: 3px solid #10b981;">
+        <div class="profile-stat-val" id="prof-adm-stat-inspections" style="color: #10b981;">0</div>
+        <div class="profile-stat-lbl">🔍 Inspections & Deals</div>
+      </div>
       <div class="profile-stat-box stat-approved" onclick="loadProfileAdminTab('all')" style="cursor: pointer;">
         <div class="profile-stat-val" id="prof-adm-stat-all" style="color: var(--color-success);">0</div>
         <div class="profile-stat-lbl">📋 All System Listings</div>
@@ -1697,6 +1749,7 @@ async function setupAdminProfileHub() {
     tabsWrap.innerHTML = `
       <button class="sub-tab-btn active" id="prof-adm-tab-pending" onclick="loadProfileAdminTab('pending')">⏳ Pending Properties (<span id="prof-adm-cnt-pending">0</span>)</button>
       <button class="sub-tab-btn" id="prof-adm-tab-bidding" onclick="loadProfileAdminTab('bidding_requests')">🏛️ Bidding Requests (<span id="prof-adm-cnt-bidding">0</span>)</button>
+      <button class="sub-tab-btn" id="prof-adm-tab-inspections" onclick="loadProfileAdminTab('inspections')">🔍 Inspections & Sales (<span id="prof-adm-cnt-inspections">0</span>)</button>
       <button class="sub-tab-btn" id="prof-adm-tab-all" onclick="loadProfileAdminTab('all')">📋 All Properties</button>
       <button class="sub-tab-btn" id="prof-adm-tab-my" onclick="loadProfileAdminTab('my_properties')">📁 My Personal Posts</button>
     `;
@@ -1713,9 +1766,10 @@ async function setupAdminProfileHub() {
 async function loadAdminProfileCounters() {
   if (!state.token) return;
   try {
-    const [pendingRes, biddingRes, allRes, myRes] = await Promise.all([
+    const [pendingRes, biddingRes, inspRes, allRes, myRes] = await Promise.all([
       fetch('/api/admin/properties/pending', { headers: { 'Authorization': `Bearer ${state.token}`, 'Accept': 'application/json' } }),
       fetch('/api/admin/bidding-requests', { headers: { 'Authorization': `Bearer ${state.token}`, 'Accept': 'application/json' } }),
+      fetch('/api/admin/requests/queue', { headers: { 'Authorization': `Bearer ${state.token}`, 'Accept': 'application/json' } }),
       fetch('/api/admin/properties/all', { headers: { 'Authorization': `Bearer ${state.token}`, 'Accept': 'application/json' } }),
       fetch('/api/my-properties', { headers: { 'Authorization': `Bearer ${state.token}`, 'Accept': 'application/json' } })
     ]);
@@ -1737,6 +1791,15 @@ async function loadAdminProfileCounters() {
       const cntEl = document.getElementById('prof-adm-cnt-bidding');
       if (statEl) statEl.textContent = bCount;
       if (cntEl) cntEl.textContent = bCount;
+    }
+
+    if (inspRes.ok) {
+      const iData = await inspRes.json();
+      const iCount = iData.total || (iData.data ? iData.data.length : 0);
+      const statEl = document.getElementById('prof-adm-stat-inspections');
+      const cntEl = document.getElementById('prof-adm-cnt-inspections');
+      if (statEl) statEl.textContent = iCount;
+      if (cntEl) cntEl.textContent = iCount;
     }
 
     if (allRes.ok) {
@@ -1765,7 +1828,8 @@ window.loadProfileAdminTab = async function (tab = 'pending', page = 1) {
 
   // Active tab styling
   document.querySelectorAll('#prof-tabs-wrap .sub-tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(`prof-adm-tab-${tab === 'bidding_requests' ? 'bidding' : (tab === 'my_properties' ? 'my' : tab)}`)?.classList.add('active');
+  const activeTabKey = tab === 'bidding_requests' ? 'bidding' : (tab === 'my_properties' ? 'my' : (tab === 'inspections' ? 'inspections' : tab));
+  document.getElementById(`prof-adm-tab-${activeTabKey}`)?.classList.add('active');
 
   if (pagination) pagination.innerHTML = '';
 
@@ -1779,6 +1843,46 @@ window.loadProfileAdminTab = async function (tab = 'pending', page = 1) {
       <p>Loading admin queue (${tab.replace('_', ' ')})...</p>
     </div>
   `;
+
+  if (tab === 'inspections') {
+    try {
+      const res = await fetch(`/api/admin/requests/queue?page=${page}`, {
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!res.ok) throw new Error('Failed to load inspection queue');
+
+      const result = await res.json();
+      const requests = result.data || [];
+
+      const statEl = document.getElementById('prof-adm-stat-inspections');
+      const cntEl = document.getElementById('prof-adm-cnt-inspections');
+      const count = result.total || requests.length;
+      if (statEl) statEl.textContent = count;
+      if (cntEl) cntEl.textContent = count;
+
+      if (requests.length === 0) {
+        container.innerHTML = `
+          <div class="state-box">
+            <div class="state-icon">🛡️</div>
+            <h3>Inspection Queue is Empty</h3>
+            <p>No purchase requests are currently awaiting inspection scheduling or sale confirmation.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = renderAdminInspectionQueueHtml(requests);
+      return;
+    } catch (err) {
+      console.error('Inspection queue error:', err);
+      container.innerHTML = `<div class="state-box"><p style="color: var(--color-danger);">${escapeHtml(err.message)}</p></div>`;
+      return;
+    }
+  }
 
   if (tab === 'bidding_requests') {
     try {
@@ -3507,4 +3611,800 @@ window.loadMyBids = async function () {
     `;
   }
 };
+
+/* ==========================================================================
+   PROPERTY PURCHASE REQUEST, INSPECTION & SALE CONFIRMATION WORKFLOW
+   Hard Privacy Enforcement: Zero Phone/Email Exposure Between Buyer & Seller
+   ========================================================================== */
+
+/**
+ * Open the Buyer Purchase & Inspection Request Modal.
+ */
+window.openPurchaseRequestModal = function (propId, title, price, location) {
+  if (!state.token || !state.user) {
+    showToast('Please sign in to submit a purchase request.', 'info');
+    openAuthModal('login', 'user');
+    return;
+  }
+
+  const modal = document.getElementById('modal-purchase-request');
+  if (!modal) return;
+
+  document.getElementById('request-property-id').value = propId;
+  document.getElementById('request-prop-title').textContent = title;
+  document.getElementById('request-prop-price').textContent = formatCurrency(price);
+  document.getElementById('request-prop-loc').textContent = location;
+
+  const offeredInput = document.getElementById('request-offered-amount');
+  if (offeredInput) offeredInput.value = price;
+
+  const dateInput = document.getElementById('request-preferred-date');
+  if (dateInput) {
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+    // Default to 3 days from now
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + 3);
+    dateInput.value = nextDate.toISOString().split('T')[0];
+  }
+
+  const notesInput = document.getElementById('request-buyer-notes');
+  if (notesInput) notesInput.value = '';
+
+  closeAllModals();
+  modal.classList.add('active');
+};
+
+/**
+ * Buyer submits purchase & inspection request.
+ */
+window.handlePurchaseRequestSubmit = async function (e) {
+  e.preventDefault();
+  const propId = document.getElementById('request-property-id').value;
+  const offeredAmount = document.getElementById('request-offered-amount').value;
+  const preferredDate = document.getElementById('request-preferred-date').value;
+  const buyerNotes = document.getElementById('request-buyer-notes').value;
+  const submitBtn = document.getElementById('btn-submit-purchase-request');
+
+  if (!propId || !offeredAmount || !preferredDate) {
+    showToast('Please fill in the offered amount and preferred date.', 'error');
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting Request...';
+  }
+
+  try {
+    const response = await fetch(`/api/properties/${propId}/requests`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        offered_amount: parseFloat(offeredAmount),
+        preferred_date: preferredDate,
+        buyer_notes: buyerNotes || null
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Purchase request submitted successfully!', 'success');
+      closeAllModals();
+      navigateTo('/my-requests');
+    } else {
+      showToast(data.message || 'Failed to submit purchase request.', 'error');
+    }
+  } catch (err) {
+    console.error('Purchase request submission error:', err);
+    showToast('Unable to submit request. Please try again.', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Request';
+    }
+  }
+};
+
+/**
+ * Load Buyer's submitted purchase requests.
+ */
+window.loadMyRequests = async function (page = 1) {
+  const container = document.getElementById('my-requests-list-container');
+  if (!container || !state.token) return;
+
+  container.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading your purchase requests...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`/api/buyer/requests?page=${page}`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to load purchase requests');
+
+    const result = await response.json();
+    const requests = result.data || [];
+
+    if (requests.length === 0) {
+      container.innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">📑</div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 6px;">No Purchase Requests Yet</h3>
+          <p style="margin-bottom: 16px;">Browse verified properties and submit an offer and inspection request.</p>
+          <button class="btn btn-primary btn-sm" onclick="navigateTo('/properties')">🔍 Browse Properties</button>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+    requests.forEach(req => {
+      let statusChip = '';
+      if (req.status === 'pending_seller_approval') {
+        statusChip = '<span class="status-chip chip-pending">⏳ Awaiting Seller Approval</span>';
+      } else if (req.status === 'declined_by_seller') {
+        statusChip = '<span class="status-chip chip-rejected">❌ Declined by Seller</span>';
+      } else if (req.status === 'forwarded_to_admin') {
+        statusChip = '<span class="status-chip" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">🛡️ In Admin Queue</span>';
+      } else if (req.status === 'schedule_fixed') {
+        statusChip = '<span class="status-chip" style="background: rgba(147, 51, 234, 0.15); color: #9333ea;">📅 Inspection Scheduled</span>';
+      } else if (req.status === 'inspection_completed') {
+        statusChip = '<span class="status-chip" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📋 Inspection Completed</span>';
+      } else if (req.status === 'sale_confirmed') {
+        statusChip = '<span class="status-chip chip-approved">🎉 Sale Confirmed & Finalized</span>';
+      } else if (req.status === 'cancelled') {
+        statusChip = '<span class="status-chip chip-rejected">❌ Deal Cancelled</span>';
+      }
+
+      html += `
+        <div class="my-property-card" style="align-items: flex-start;">
+          <div>
+            <img src="${req.property_image || '/images/hero_building.jpg'}" class="my-prop-img" onerror="this.src='/images/hero_building.jpg'">
+          </div>
+
+          <div style="flex: 1;">
+            <div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center; flex-wrap: wrap;">
+              ${statusChip}
+              <span class="status-chip chip-type">Request #${req.id}</span>
+              <span style="font-size: 0.8rem; color: var(--color-text-muted);">
+                Preferred Date: <strong>${escapeHtml(req.preferred_date || 'N/A')}</strong>
+              </span>
+            </div>
+
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 4px;">${escapeHtml(req.property_title || 'Untitled Property')}</h3>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 8px;">
+              📍 ${escapeHtml(req.property_location || 'N/A')} • Verified Seller: <strong>${escapeHtml(req.seller?.name || 'Seller')}</strong>
+            </div>
+
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; background: var(--color-input); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 8px;">
+              <div>Asking Price: <strong>${formatCurrency(req.property_price)}</strong></div>
+              <div>Your Offer: <strong style="color: var(--color-brand); font-size: 0.95rem;">${formatCurrency(req.offered_amount)}</strong></div>
+            </div>
+
+            ${req.buyer_notes ? `
+              <div style="font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                <strong>Your Notes:</strong> ${escapeHtml(req.buyer_notes)}
+              </div>
+            ` : ''}
+
+            ${req.seller_notes ? `
+              <div style="font-size: 0.82rem; background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 6px 10px; margin-top: 6px;">
+                <strong>Seller Feedback:</strong> ${escapeHtml(req.seller_notes)}
+              </div>
+            ` : ''}
+
+            ${req.inspection_scheduled_at ? `
+              <div style="font-size: 0.85rem; background: rgba(99, 102, 241, 0.08); border-left: 3px solid #6366f1; padding: 8px 12px; margin-top: 6px; border-radius: 4px;">
+                <strong>📅 Physical Inspection Schedule:</strong> ${new Date(req.inspection_scheduled_at).toLocaleString()}
+                ${req.inspection_notes ? `<div style="font-size: 0.8rem; margin-top: 2px;">Notes: ${escapeHtml(req.inspection_notes)}</div>` : ''}
+              </div>
+            ` : ''}
+
+            ${req.inspection_findings ? `
+              <div style="font-size: 0.85rem; background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 8px 12px; margin-top: 6px; border-radius: 4px;">
+                <strong>📋 Verified Inspection Findings:</strong> ${escapeHtml(req.inspection_findings)}
+              </div>
+            ` : ''}
+
+            ${req.cancellation_reason ? `
+              <div style="font-size: 0.85rem; background: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; padding: 8px 12px; margin-top: 6px; border-radius: 4px;">
+                <strong>Cancellation Reason:</strong> ${escapeHtml(req.cancellation_reason)}
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; min-width: 130px;">
+            <button class="btn btn-secondary btn-sm w-full" onclick="openPropertyDetailModal(${req.property_id})">
+              View Property
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Buyer requests load error:', err);
+    container.innerHTML = `
+      <div class="state-box">
+        <p style="color: var(--color-danger);">Failed to load your purchase requests (${escapeHtml(err.message)}).</p>
+        <button class="btn btn-secondary btn-sm" onclick="loadMyRequests()">Retry</button>
+      </div>
+    `;
+  }
+};
+
+/**
+ * Open Seller's Incoming Requests Modal for a specific property.
+ */
+window.openSellerRequestsModal = async function (propId, propTitle) {
+  const modal = document.getElementById('modal-seller-requests');
+  const body = document.getElementById('seller-requests-modal-body');
+  if (!modal || !body) return;
+
+  closeAllModals();
+  modal.classList.add('active');
+
+  body.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <h4 style="font-size: 1.1rem; color: var(--color-brand);">${escapeHtml(propTitle)}</h4>
+      <p style="font-size: 0.82rem; color: var(--color-text-muted);">
+        Review incoming purchase offers and preferred inspection dates from genuine buyers.
+        <br><strong>Locking Rule:</strong> You can forward ONE request to Admin for physical inspection at a time.
+      </p>
+    </div>
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading incoming requests...</p>
+    </div>
+  `;
+
+  try {
+    const response = await fetch(`/api/seller/requests?property_id=${propId}`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to load incoming requests');
+
+    const result = await response.json();
+    const requests = result.data || [];
+
+    if (requests.length === 0) {
+      body.innerHTML = `
+        <div style="margin-bottom: 16px;">
+          <h4 style="font-size: 1.1rem; color: var(--color-brand);">${escapeHtml(propTitle)}</h4>
+        </div>
+        <div class="state-box">
+          <div class="state-icon">📭</div>
+          <h3>No purchase requests received yet</h3>
+          <p>When buyers submit an offer and inspection date, they will appear here for your approval.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Check if any request is currently forwarded/locked in admin pipeline
+    const hasLockedRequest = requests.some(r => ['forwarded_to_admin', 'schedule_fixed', 'inspection_completed'].includes(r.status));
+
+    let html = `
+      <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div>
+          <h4 style="font-size: 1.1rem; color: var(--color-brand);">${escapeHtml(propTitle)}</h4>
+          <span style="font-size: 0.8rem; color: var(--color-text-muted);">${requests.length} total request(s) received</span>
+        </div>
+        ${hasLockedRequest ? `
+          <span style="font-size: 0.78rem; background: rgba(99, 102, 241, 0.12); color: #6366f1; padding: 4px 10px; border-radius: 999px; font-weight: 600;">
+            🔒 A request is currently with Admin for inspection
+          </span>
+        ` : ''}
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+    `;
+
+    requests.forEach(r => {
+      let statusBadge = '';
+      if (r.status === 'pending_seller_approval') {
+        statusBadge = '<span class="status-chip chip-pending">⏳ Needs Your Decision</span>';
+      } else if (r.status === 'forwarded_to_admin') {
+        statusBadge = '<span class="status-chip" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">🛡️ Forwarded to Admin</span>';
+      } else if (r.status === 'schedule_fixed') {
+        statusBadge = '<span class="status-chip" style="background: rgba(147, 51, 234, 0.15); color: #9333ea;">📅 Inspection Scheduled</span>';
+      } else if (r.status === 'inspection_completed') {
+        statusBadge = '<span class="status-chip" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📋 Inspection Conducted</span>';
+      } else if (r.status === 'sale_confirmed') {
+        statusBadge = '<span class="status-chip chip-approved">🎉 Sale Confirmed</span>';
+      } else if (r.status === 'declined_by_seller') {
+        statusBadge = '<span class="status-chip chip-rejected">Declined</span>';
+      } else if (r.status === 'cancelled') {
+        statusBadge = '<span class="status-chip chip-rejected">Cancelled</span>';
+      }
+
+      html += `
+        <div style="border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px; background: var(--color-surface);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+            <div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <strong style="font-size: 0.98rem;">${escapeHtml(r.buyer?.name || 'Verified Buyer')}</strong>
+                ${statusBadge}
+              </div>
+              <span style="font-size: 0.78rem; color: var(--color-text-muted);">
+                Requested Date: <strong>${escapeHtml(r.preferred_date || 'N/A')}</strong> • Submitted: ${new Date(r.created_at).toLocaleDateString()}
+              </span>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--color-brand);">${formatCurrency(r.offered_amount)}</div>
+              <span style="font-size: 0.75rem; color: var(--color-text-muted);">Offered Amount</span>
+            </div>
+          </div>
+
+          ${r.buyer_notes ? `
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); background: var(--color-input); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px;">
+              <strong>Buyer Note:</strong> ${escapeHtml(r.buyer_notes)}
+            </div>
+          ` : ''}
+
+          ${r.status === 'pending_seller_approval' ? `
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+              <button class="btn btn-secondary btn-sm" onclick="sellerDeclineRequest(${r.id}, ${propId}, '${escapeHtml(propTitle).replace(/'/g, "\\'")}')" style="color: var(--color-danger);">
+                Decline
+              </button>
+              <button class="btn btn-primary btn-sm" ${hasLockedRequest ? 'disabled title="Another request is already in inspection"' : ''} onclick="sellerForwardRequest(${r.id}, ${propId}, '${escapeHtml(propTitle).replace(/'/g, "\\'")}')">
+                ✓ Approve & Forward to Admin
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    body.innerHTML = html;
+  } catch (err) {
+    console.error('Seller requests load error:', err);
+    body.innerHTML = `<div class="state-box"><p style="color: var(--color-danger);">${escapeHtml(err.message)}</p></div>`;
+  }
+};
+
+/**
+ * Seller approves & forwards request to admin.
+ */
+window.sellerForwardRequest = async function (requestId, propId, propTitle) {
+  if (!confirm('Are you sure you want to approve this offer and forward to Admin to schedule physical inspection? This will lock this property for inspection.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/seller/requests/${requestId}/forward`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Request forwarded to Admin for inspection scheduling.', 'success');
+      openSellerRequestsModal(propId, propTitle);
+      loadMyProperties();
+    } else {
+      showToast(data.message || 'Failed to forward request.', 'error');
+    }
+  } catch (err) {
+    console.error('Forward request error:', err);
+    showToast('Failed to forward request.', 'error');
+  }
+};
+
+/**
+ * Seller declines a purchase request.
+ */
+window.sellerDeclineRequest = async function (requestId, propId, propTitle) {
+  const reason = prompt('Optional reason for declining this offer (e.g. price too low):');
+  if (reason === null) return; // cancelled
+
+  try {
+    const response = await fetch(`/api/seller/requests/${requestId}/decline`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ seller_notes: reason || null })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Request declined.', 'info');
+      openSellerRequestsModal(propId, propTitle);
+    } else {
+      showToast(data.message || 'Failed to decline request.', 'error');
+    }
+  } catch (err) {
+    console.error('Decline request error:', err);
+    showToast('Failed to decline request.', 'error');
+  }
+};
+
+/**
+ * Helper to render admin inspection review cards.
+ */
+window.renderAdminInspectionQueueHtml = function (requests) {
+  let html = '<div style="display: flex; flex-direction: column; gap: 14px;">';
+  requests.forEach(req => {
+    let statusChip = '';
+    if (req.status === 'forwarded_to_admin') {
+      statusChip = '<span class="status-chip" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">Step 3: Needs Inspection Schedule</span>';
+    } else if (req.status === 'schedule_fixed') {
+      statusChip = '<span class="status-chip" style="background: rgba(147, 51, 234, 0.15); color: #9333ea;">Step 4: Inspection Scheduled</span>';
+    } else if (req.status === 'inspection_completed') {
+      statusChip = '<span class="status-chip" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">Step 5: Inspection Done — Final Decision</span>';
+    }
+
+    html += `
+      <div class="admin-review-card">
+        <div class="admin-card-head" style="align-items: flex-start;">
+          <div>
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px; flex-wrap: wrap;">
+              ${statusChip}
+              <span class="status-chip chip-type">Request #${req.id}</span>
+            </div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 2px;">${escapeHtml(req.property_title || 'Untitled Property')}</h3>
+            <div style="font-size: 0.85rem; color: var(--color-text-muted);">
+              📍 ${escapeHtml(req.property_location || 'N/A')} • Buyer: <strong>${escapeHtml(req.buyer?.name || 'Buyer')}</strong> • Seller: <strong>${escapeHtml(req.seller?.name || 'Seller')}</strong>
+            </div>
+          </div>
+
+          <div style="text-align: right;">
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--color-brand);">${formatCurrency(req.offered_amount)}</div>
+            <span style="font-size: 0.78rem; color: var(--color-text-muted);">Offered (Asking: ${formatCurrency(req.property_price)})</span>
+          </div>
+        </div>
+
+        <div style="background: var(--color-input); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 0.85rem;">
+          <div><strong>Buyer Preferred Date:</strong> ${escapeHtml(req.preferred_date || 'N/A')}</div>
+          ${req.buyer_notes ? `<div><strong>Buyer Notes:</strong> ${escapeHtml(req.buyer_notes)}</div>` : ''}
+          ${req.seller_notes ? `<div><strong>Seller Notes:</strong> ${escapeHtml(req.seller_notes)}</div>` : ''}
+          ${req.inspection_scheduled_at ? `
+            <div style="margin-top: 4px; color: #6366f1;">
+              <strong>Fixed Inspection Time:</strong> ${new Date(req.inspection_scheduled_at).toLocaleString()}
+              ${req.inspection_notes ? ` • Note: ${escapeHtml(req.inspection_notes)}` : ''}
+            </div>
+          ` : ''}
+          ${req.inspection_findings ? `
+            <div style="margin-top: 4px; color: #10b981;">
+              <strong>Inspection Findings:</strong> ${escapeHtml(req.inspection_findings)}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Sequential Workflow Actions -->
+        <div style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+          ${(req.status === 'forwarded_to_admin' || req.status === 'schedule_fixed') ? `
+            <button class="btn btn-primary btn-sm" onclick="openAdminScheduleModal(${req.id})">
+              📅 ${req.status === 'schedule_fixed' ? 'Reschedule Inspection' : 'Fix Schedule'}
+            </button>
+          ` : ''}
+
+          ${req.status === 'schedule_fixed' ? `
+            <button class="btn btn-primary btn-sm" onclick="openAdminCompleteInspectionModal(${req.id})" style="background: linear-gradient(135deg, #10b981, #059669);">
+              📋 Record Inspection Findings
+            </button>
+          ` : ''}
+
+          ${req.status === 'inspection_completed' ? `
+            <button class="btn btn-primary btn-sm" onclick="adminConfirmSale(${req.id})" style="background: linear-gradient(135deg, #10b981, #047857);">
+              ✓ Confirm Sale & Mark Sold
+            </button>
+          ` : ''}
+
+          <button class="btn btn-secondary btn-sm" onclick="openAdminCancelDealModal(${req.id})" style="color: var(--color-danger);">
+            ❌ Cancel Deal
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  return html;
+};
+
+/**
+ * Load the global inspection & purchase queue for Admin.
+ */
+window.loadAdminInspectionQueue = async function (page = 1) {
+  const container = document.getElementById('admin-queue-container');
+  const pagination = document.getElementById('admin-pagination-container');
+  if (!container || !state.token) return;
+
+  container.innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>Loading Global Inspection & Deal Queue...</p>
+    </div>
+  `;
+  if (pagination) pagination.innerHTML = '';
+
+  try {
+    const response = await fetch(`/api/admin/requests/queue?page=${page}`, {
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error('Failed to load inspection queue');
+
+    const result = await response.json();
+    const requests = result.data || [];
+
+    const inspectionsCountEl = document.getElementById('admin-inspections-count');
+    if (inspectionsCountEl) inspectionsCountEl.textContent = result.total || requests.length;
+
+    if (requests.length === 0) {
+      container.innerHTML = `
+        <div class="state-box">
+          <div class="state-icon">🛡️</div>
+          <h3>Inspection Queue is Empty</h3>
+          <p>No purchase requests are currently awaiting inspection scheduling or sale confirmation.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = renderAdminInspectionQueueHtml(requests);
+  } catch (err) {
+    console.error('Inspection queue error:', err);
+    container.innerHTML = `<div class="state-box"><p style="color: var(--color-danger);">${escapeHtml(err.message)}</p></div>`;
+  }
+};
+
+/**
+ * Open modal to fix inspection schedule.
+ */
+window.openAdminScheduleModal = function (requestId) {
+  const modal = document.getElementById('modal-admin-schedule');
+  if (!modal) return;
+
+  document.getElementById('schedule-request-id').value = requestId;
+  const datetimeInput = document.getElementById('schedule-datetime');
+  if (datetimeInput) {
+    const nextHour = new Date();
+    nextHour.setDate(nextHour.getDate() + 1);
+    nextHour.setHours(10, 0, 0, 0);
+    datetimeInput.value = nextHour.toISOString().slice(0, 16);
+  }
+
+  closeAllModals();
+  modal.classList.add('active');
+};
+
+/**
+ * Admin fixes inspection schedule.
+ */
+window.handleAdminScheduleSubmit = async function (e) {
+  e.preventDefault();
+  const requestId = document.getElementById('schedule-request-id').value;
+  const scheduledAt = document.getElementById('schedule-datetime').value;
+  const notes = document.getElementById('schedule-notes').value;
+  const submitBtn = document.getElementById('btn-confirm-schedule');
+
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const response = await fetch(`/api/admin/requests/${requestId}/schedule`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        inspection_scheduled_at: scheduledAt,
+        inspection_notes: notes || null
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Inspection schedule fixed!', 'success');
+      closeAllModals();
+      refreshAdminViews();
+    } else {
+      showToast(data.message || 'Failed to fix schedule.', 'error');
+    }
+  } catch (err) {
+    console.error('Schedule error:', err);
+    showToast('Failed to fix schedule.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+};
+
+/**
+ * Open modal to record inspection findings.
+ */
+window.openAdminCompleteInspectionModal = function (requestId) {
+  const modal = document.getElementById('modal-admin-complete-inspection');
+  if (!modal) return;
+
+  document.getElementById('complete-inspection-request-id').value = requestId;
+  document.getElementById('inspection-findings-text').value = '';
+
+  closeAllModals();
+  modal.classList.add('active');
+};
+
+/**
+ * Admin records inspection findings & marks completed.
+ */
+window.handleAdminCompleteInspectionSubmit = async function (e) {
+  e.preventDefault();
+  const requestId = document.getElementById('complete-inspection-request-id').value;
+  const findings = document.getElementById('inspection-findings-text').value;
+  const submitBtn = document.getElementById('btn-confirm-inspection-findings');
+
+  if (!findings || findings.length < 5) {
+    showToast('Please provide detailed findings (at least 5 characters).', 'error');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const response = await fetch(`/api/admin/requests/${requestId}/complete-inspection`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        inspection_findings: findings
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Inspection completed successfully!', 'success');
+      closeAllModals();
+      refreshAdminViews();
+    } else {
+      showToast(data.message || 'Failed to record findings.', 'error');
+    }
+  } catch (err) {
+    console.error('Inspection completion error:', err);
+    showToast('Failed to record findings.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+};
+
+/**
+ * Admin confirms sale and marks property sold.
+ */
+window.adminConfirmSale = async function (requestId) {
+  if (!confirm('Are you sure you want to CONFIRM SALE for this property? This will mark the property as SOLD, record the final sale transaction, and complete the deal.')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/admin/requests/${requestId}/confirm-sale`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Sale confirmed! Property marked as SOLD.', 'success');
+      refreshAdminViews();
+    } else {
+      showToast(data.message || 'Failed to confirm sale.', 'error');
+    }
+  } catch (err) {
+    console.error('Confirm sale error:', err);
+    showToast('Failed to confirm sale.', 'error');
+  }
+};
+
+/**
+ * Open modal to cancel deal.
+ */
+window.openAdminCancelDealModal = function (requestId) {
+  const modal = document.getElementById('modal-admin-cancel-deal');
+  if (!modal) return;
+
+  document.getElementById('cancel-deal-request-id').value = requestId;
+  document.getElementById('cancel-deal-reason').value = '';
+
+  closeAllModals();
+  modal.classList.add('active');
+};
+
+/**
+ * Admin confirms deal cancellation and rolls property back to available.
+ */
+window.handleAdminCancelDealSubmit = async function (e) {
+  e.preventDefault();
+  const requestId = document.getElementById('cancel-deal-request-id').value;
+  const reason = document.getElementById('cancel-deal-reason').value;
+  const submitBtn = document.getElementById('btn-confirm-cancel-deal');
+
+  if (!reason || reason.length < 5) {
+    showToast('Please provide a valid cancellation reason.', 'error');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const response = await fetch(`/api/admin/requests/${requestId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        cancellation_reason: reason
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(data.message || 'Deal cancelled. Property restored to available.', 'info');
+      closeAllModals();
+      refreshAdminViews();
+    } else {
+      showToast(data.message || 'Failed to cancel deal.', 'error');
+    }
+  } catch (err) {
+    console.error('Cancel deal error:', err);
+    showToast('Failed to cancel deal.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+};
+
+/**
+ * Synchronize all admin dashboards across dedicated workspace and profile hub.
+ */
+window.refreshAdminViews = function () {
+  loadAdminInspectionQueue();
+  if (state.profileAdminTab === 'inspections') {
+    loadProfileAdminTab('inspections');
+  }
+  loadAdminProfileCounters();
+  loadAdminPendingCount();
+};
+
 

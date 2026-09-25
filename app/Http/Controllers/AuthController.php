@@ -82,6 +82,7 @@ class AuthController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
+        Auth::guard('web')->logout();
 
         // Revoke all previous tokens so each device gets a fresh token
         $user->tokens()->delete();
