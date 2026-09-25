@@ -104,59 +104,6 @@ class PropertyController extends Controller
     }
 
     /**
-     * Compare multiple approved properties side-by-side.
-     *
-     * GET /api/properties/compare?ids[]=1&ids[]=2
-     */
-    public function compare(Request $request): JsonResponse
-    {
-        $rawIds = $request->query('ids', []);
-
-        if (is_string($rawIds)) {
-            $rawIds = array_filter(array_map('trim', explode(',', $rawIds)));
-        }
-
-        if (!is_array($rawIds)) {
-            $rawIds = [$rawIds];
-        }
-
-        $ids = array_values(array_unique(array_filter(array_map(function ($value) {
-            $id = (int) $value;
-            return $id > 0 ? $id : null;
-        }, $rawIds))));
-
-        if (count($ids) < 2) {
-            return response()->json([
-                'message' => 'Select at least two approved properties to compare.',
-            ], 422);
-        }
-
-        $ids = array_slice($ids, 0, 4);
-
-        $properties = Property::query()
-            ->approved()
-            ->with(['images', 'user:id,name,phone,company_name,verification_status'])
-            ->whereIn('id', $ids)
-            ->get()
-            ->keyBy('id');
-
-        $ordered = collect($ids)
-            ->map(fn (int $id) => $properties->get($id))
-            ->filter()
-            ->values();
-
-        if ($ordered->count() < 2) {
-            return response()->json([
-                'message' => 'At least two approved properties are required for comparison.',
-            ], 422);
-        }
-
-        return response()->json([
-            'properties' => $ordered->map(fn (Property $property) => $this->formatComparisonProperty($property))->values(),
-        ]);
-    }
-
-    /**
      * Display a single APPROVED property for public view.
      *
      * GET /api/properties/{id}
@@ -578,7 +525,6 @@ class PropertyController extends Controller
             'address'            => $property->address,
             'phone'              => $property->phone ?? $property->user?->phone,
             'transaction_status' => $property->transaction_status,
-            'verification_status' => $property->verification_status,
             'main_image'         => $primaryImg ? $primaryImg->url : null,
             'live_auction'       => $liveAuction,
             'images'             => $property->images->map(fn($img) => [
@@ -600,40 +546,6 @@ class PropertyController extends Controller
         }
 
         return $data;
-    }
-
-    /**
-     * Format property data specifically for the comparison matrix.
-     */
-    private function formatComparisonProperty(Property $property): array
-    {
-        $primaryImg = $property->images->firstWhere('is_primary', true) ?? $property->images->first();
-
-        $size = is_numeric($property->size) ? (float) $property->size : null;
-        $price = is_numeric($property->price) ? (float) $property->price : null;
-        $pricePerSqft = ($price !== null && $size !== null && $size > 0) ? round($price / $size, 2) : null;
-
-        return [
-            'id'                  => $property->id,
-            'title'               => $property->title,
-            'property_type'       => $property->property_type,
-            'location'            => $property->location,
-            'address'             => $property->address,
-            'verification_status' => $property->verification_status,
-            'transaction_status'  => $property->transaction_status,
-            'price'               => $property->price,
-            'price_per_sqft'      => $pricePerSqft,
-            'size'                => $property->size,
-            'bedrooms'            => $property->bedrooms,
-            'bathrooms'           => $property->bathrooms,
-            'phone'               => $property->phone ?? $property->user?->phone,
-            'main_image'          => $primaryImg ? $primaryImg->url : null,
-            'seller'              => [
-                'name'                => $property->user?->name,
-                'company_name'        => $property->user?->company_name,
-                'verification_status' => $property->user?->verification_status,
-            ],
-        ];
     }
 
     /**
