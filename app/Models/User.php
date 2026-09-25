@@ -135,4 +135,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(PropertySale::class, 'buyer_id');
     }
+
+    /**
+     * Purchase/inspection requests placed by this user as a buyer.
+     */
+    public function purchaseRequestsAsBuyer()
+    {
+        return $this->hasMany(PropertyRequest::class, 'buyer_id');
+    }
+
+    /**
+     * Purchase/inspection requests received by this user as a seller.
+     */
+    public function purchaseRequestsAsSeller()
+    {
+        return $this->hasMany(PropertyRequest::class, 'seller_id');
+    }
 }

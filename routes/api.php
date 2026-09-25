@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminPropertyController;
 use App\Http\Controllers\AuctionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\PropertyRequestController;
 use App\Http\Controllers\UsersController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -72,6 +73,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-bids',                                      [AuctionController::class, 'myBids']);
 
     // ─────────────────────────────────────────
+    //  Property Purchase & Inspection Requests (Buyer & Seller)
+    // ─────────────────────────────────────────
+    // Buyer
+    Route::post('/properties/{id}/requests',                    [PropertyRequestController::class, 'store']);
+    Route::get('/buyer/requests',                               [PropertyRequestController::class, 'buyerIndex']);
+    Route::get('/buyer/requests/{id}',                          [PropertyRequestController::class, 'buyerShow']);
+
+    // Seller
+    Route::get('/seller/requests',                              [PropertyRequestController::class, 'sellerIndex']);
+    Route::post('/seller/requests/{id}/decline',                [PropertyRequestController::class, 'sellerDecline']);
+    Route::post('/seller/requests/{id}/forward',                [PropertyRequestController::class, 'sellerForward']);
+
+    // ─────────────────────────────────────────
     //  Admin-only Routes (role = admin required)
     // ─────────────────────────────────────────
     Route::middleware('admin')->prefix('admin')->group(function () {
@@ -91,6 +105,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/bidding-requests',                                                  [AdminAuctionController::class, 'index']);
         Route::post('/bidding-requests/{id}/approve',                                    [AdminAuctionController::class, 'approve']);
         Route::post('/bidding-requests/{id}/reject',                                     [AdminAuctionController::class, 'reject']);
+
+        // Property Purchase Request & Global Inspection Queue Workflow
+        Route::get('/requests/queue',                                                    [PropertyRequestController::class, 'adminQueue']);
+        Route::post('/requests/{id}/schedule',                                           [PropertyRequestController::class, 'adminSchedule']);
+        Route::post('/requests/{id}/complete-inspection',                                [PropertyRequestController::class, 'adminCompleteInspection']);
+        Route::post('/requests/{id}/confirm-sale',                                      [PropertyRequestController::class, 'adminConfirmSale']);
+        Route::post('/requests/{id}/cancel',                                            [PropertyRequestController::class, 'adminCancel']);
     });
 });
 

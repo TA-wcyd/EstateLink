@@ -49,6 +49,9 @@
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-my-bids" onclick="navigateTo('/my-bids')" style="display: none;">
                         🎯 My Bids
                     </a>
+                    <a href="javascript:void(0)" class="nav-link" id="nav-link-my-requests" onclick="navigateTo('/my-requests')" style="display: none;">
+                        📑 My Requests
+                    </a>
                     <a href="javascript:void(0)" class="nav-link" id="nav-link-profile" onclick="navigateTo('/profile')" style="display: none;">
                         👤 Profile & Submissions
                     </a>
@@ -459,6 +462,21 @@
             </div>
 
             <!-- ===============================================================
+                 VIEW 6: BUYER PURCHASE & INSPECTION REQUESTS (/my-requests)
+                 =============================================================== -->
+            <div id="view-my-requests" class="app-view">
+                <div class="page-header">
+                    <div class="pill-tag"><span>📑</span><span>Purchase & Inspection Portfolio</span></div>
+                    <h2 class="page-title">My Purchase & Inspection Requests</h2>
+                    <p class="page-subtitle">Track your offers, seller approval state, scheduled physical inspections, and final sale confirmations.</p>
+                </div>
+
+                <div id="my-requests-list-container">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- ===============================================================
                  VIEW 6: ADMIN VERIFICATION & AUCTION QUEUE (/admin/properties)
                  =============================================================== -->
             <div id="view-admin-properties" class="app-view">
@@ -476,6 +494,9 @@
                     </button>
                     <button class="btn btn-sm btn-secondary" id="btn-admin-tab-bidding" onclick="loadAdminQueue('bidding_requests')">
                         🏛️ Bidding Requests (<span id="admin-bidding-count">0</span>)
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="btn-admin-tab-inspections" onclick="loadAdminQueue('inspections')">
+                        🔍 Inspection Queue (<span id="admin-inspections-count">0</span>)
                     </button>
                     <button class="btn btn-sm btn-secondary" id="btn-admin-tab-all" onclick="loadAdminQueue('all')">
                         📋 All Properties History
@@ -925,6 +946,144 @@
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
                     <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
                     <button type="submit" class="btn btn-danger" id="btn-confirm-bidding-reject">Reject Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 8. Buyer Purchase & Inspection Request Modal -->
+    <div class="modal-backdrop" id="modal-purchase-request">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">📝 Submit Purchase & Inspection Request</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-purchase-request" onsubmit="handlePurchaseRequestSubmit(event)">
+                <input type="hidden" id="request-property-id" value="">
+                
+                <div style="background: var(--color-brand-soft); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <div style="font-weight: 700; color: var(--color-brand); font-size: 0.95rem;" id="request-prop-title">Property Title</div>
+                    <div style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 2px;">
+                        Asking Price: <strong id="request-prop-price">৳0</strong> • Location: <span id="request-prop-loc">-</span>
+                    </div>
+                </div>
+
+                <div class="privacy-alert" style="margin-bottom: 16px; font-size: 0.8rem; background: rgba(15, 118, 110, 0.08); border-left: 3px solid var(--color-brand); padding: 10px 12px;">
+                    <strong>🔒 Hard Privacy Rule:</strong> Do NOT include any phone number, email address, WhatsApp number, or social media handle in your notes. All negotiation, scheduling, and approvals are handled exclusively through verified platform status updates.
+                </div>
+
+                <div class="form-field">
+                    <label for="request-offered-amount">Your Offered Amount (BDT ৳) *</label>
+                    <input type="number" id="request-offered-amount" min="1" step="any" placeholder="Enter offered amount in BDT" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="request-preferred-date">Preferred Physical Inspection Date *</label>
+                    <input type="date" id="request-preferred-date" required>
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">When you would like the physical inspection to take place.</span>
+                </div>
+
+                <div class="form-field">
+                    <label for="request-buyer-notes">Notes to Seller (Optional)</label>
+                    <textarea id="request-buyer-notes" placeholder="e.g. Inquiring about possession timeline or financing pre-approval. Do NOT add phone/email." style="min-height: 80px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-purchase-request">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 9. Seller Incoming Requests Modal -->
+    <div class="modal-backdrop" id="modal-seller-requests">
+        <div class="modal-card modal-card-lg">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">📥 Incoming Purchase & Inspection Requests</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div id="seller-requests-modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. Admin Inspection Scheduling Modal -->
+    <div class="modal-backdrop" id="modal-admin-schedule">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">📅 Fix Inspection Schedule</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-admin-schedule" onsubmit="handleAdminScheduleSubmit(event)">
+                <input type="hidden" id="schedule-request-id" value="">
+                
+                <div class="form-field">
+                    <label for="schedule-datetime">Inspection Date & Time *</label>
+                    <input type="datetime-local" id="schedule-datetime" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="schedule-notes">Surveyor / Inspection Notes (Optional)</label>
+                    <textarea id="schedule-notes" placeholder="Enter assigned surveyor, meeting point, or specific inspection instructions..." style="min-height: 90px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-confirm-schedule">Fix Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 11. Admin Complete Inspection Modal -->
+    <div class="modal-backdrop" id="modal-admin-complete-inspection">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">📋 Record Inspection Findings</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-admin-complete-inspection" onsubmit="handleAdminCompleteInspectionSubmit(event)">
+                <input type="hidden" id="complete-inspection-request-id" value="">
+                
+                <div class="form-field">
+                    <label for="inspection-findings-text">Inspection Findings & Survey Report *</label>
+                    <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                        Record findings regarding physical structure, utility connections, boundary verification, and overall compliance.
+                    </p>
+                    <textarea id="inspection-findings-text" placeholder="Detail the verified condition of the property..." required style="min-height: 120px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-confirm-inspection-findings">Record Findings & Complete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 12. Admin Cancel Deal Modal -->
+    <div class="modal-backdrop" id="modal-admin-cancel-deal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem; color: #ef4444;">❌ Cancel Deal & Roll Back Property</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-admin-cancel-deal" onsubmit="handleAdminCancelDealSubmit(event)">
+                <input type="hidden" id="cancel-deal-request-id" value="">
+                
+                <div class="form-field">
+                    <label for="cancel-deal-reason">Cancellation Reason *</label>
+                    <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                        State clearly why this deal is cancelled (e.g. failed physical inspection, buyer backed out, financing rejected). Property will be restored to Available.
+                    </p>
+                    <textarea id="cancel-deal-reason" placeholder="Enter reason for cancelling the deal..." required style="min-height: 100px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="btn-confirm-cancel-deal">Confirm Cancellation</button>
                 </div>
             </form>
         </div>

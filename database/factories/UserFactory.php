@@ -25,20 +25,36 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
+            'phone' => fake()->numerify('01#########'),
             'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
+            'national_id' => fake()->unique()->numerify('##########'),
+            'password' => static::$password ??= Hash::make('Password1'),
+            'facebook_url' => null,
+            'company_name' => null,
+            'role' => 'user',
+            'verification_status' => 'pending',
             'remember_token' => Str::random(10),
         ];
     }
 
     /**
-     * Indicate that the model's email address should be unverified.
+     * Create an admin user.
      */
-    public function unverified(): static
+    public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'role' => 'admin',
+            'verification_status' => 'verified',
+        ]);
+    }
+
+    /**
+     * Create a verified user.
+     */
+    public function verified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'verification_status' => 'verified',
         ]);
     }
 }
