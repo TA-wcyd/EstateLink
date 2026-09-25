@@ -24,10 +24,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/properties/compare', function () {
-    return view('welcome');
-});
-
 // SPA catch-all for frontend routes
 Route::get('/{any}', function () {
     return view('welcome');

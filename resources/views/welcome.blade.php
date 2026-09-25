@@ -251,20 +251,7 @@
             </div>
 
             <!-- ===============================================================
-                 VIEW 3: PROPERTY COMPARATOR (/properties/compare)
-                 =============================================================== -->
-            <div id="view-property-compare" class="app-view">
-                <div class="page-header">
-                    <div class="pill-tag"><span>⚖️</span><span>Property Comparator</span></div>
-                    <h2 class="page-title">Compare Verified Properties</h2>
-                    <p class="page-subtitle">Evaluate price, size, location, and verification details side-by-side before you make a decision.</p>
-                </div>
-
-                <div id="comparison-page-content"></div>
-            </div>
-
-            <!-- ===============================================================
-                 VIEW 4: SELL PROPERTY FORM (/sell-property)
+                 VIEW 3: SELL PROPERTY FORM (/sell-property)
                  =============================================================== -->
             <div id="view-sell-property" class="app-view">
                 <div class="page-header" style="text-align: center; max-width: 700px; margin: 0 auto 28px;">
@@ -836,41 +823,7 @@
         </div>
     </div>
 
-    <!-- 4. Property Comparator Selector Modal -->
-    <div class="modal-backdrop" id="modal-property-compare-selector">
-        <div class="modal-card modal-card-lg">
-            <div class="modal-header">
-                <h3 style="font-size: 1.25rem;">Add Property to Compare</h3>
-                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
-            </div>
-
-            <div class="compare-selector-controls">
-                <input type="text" id="compare-selector-search" class="filter-input" placeholder="Search by title or location..." />
-                <select id="compare-selector-type" class="filter-select">
-                    <option value="">All Types</option>
-                    <option value="apartment">Apartment</option>
-                    <option value="house">House</option>
-                    <option value="villa">Villa</option>
-                    <option value="commercial">Commercial</option>
-                    <option value="land">Land</option>
-                    <option value="studio">Studio</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-
-            <div id="compare-selector-results" class="compare-selector-list"></div>
-
-            <div class="compare-selection-footer">
-                <div id="compare-selected-summary">0 of 4 selected</div>
-                <div class="compare-modal-actions">
-                    <button class="btn btn-secondary btn-sm" type="button" onclick="closeAllModals()">Close</button>
-                    <button class="btn btn-primary btn-sm" type="button" id="compare-open-selected-btn" onclick="renderComparisonPage()">Compare Selected</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 5. Admin Verification Dossier Modal -->
+    <!-- 4. Admin Verification Dossier Modal -->
     <div class="modal-backdrop" id="modal-admin-review">
         <div class="modal-card modal-card-lg">
             <div class="modal-header">
@@ -881,7 +834,7 @@
         </div>
     </div>
 
-    <!-- 6. Admin Rejection Reason Modal -->
+    <!-- 5. Admin Rejection Reason Modal -->
     <div class="modal-backdrop" id="modal-admin-reject">
         <div class="modal-card">
             <div class="modal-header">

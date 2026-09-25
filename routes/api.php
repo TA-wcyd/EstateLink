@@ -30,10 +30,9 @@ Route::post('/login',    [AuthController::class, 'login'])->name('login');
 //  STRICT RULE: ONLY approved properties returned.
 // ─────────────────────────────────────────────
 Route::get('/properties',              [PropertyController::class, 'index']);
-Route::get('/properties/compare',       [PropertyController::class, 'compare']);
-Route::get('/properties/{id}',          [PropertyController::class, 'show']);
-Route::get('/properties/{id}/auction',  [AuctionController::class, 'showAuction']);
-Route::get('/properties/{id}/bids',     [AuctionController::class, 'showAuction']); // alias
+Route::get('/properties/{id}',         [PropertyController::class, 'show']);
+Route::get('/properties/{id}/auction', [AuctionController::class, 'showAuction']);
+Route::get('/properties/{id}/bids',    [AuctionController::class, 'showAuction']); // alias
 
 // ─────────────────────────────────────────────
 //  Protected Routes (Bearer token required)
