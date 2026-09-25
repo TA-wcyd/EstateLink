@@ -71,6 +71,11 @@ class PropertyRequest extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
+    public function chatRoom(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ChatRoom::class);
+    }
+
     /* =========================================================================
        QUERY SCOPES
        ========================================================================= */

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>EstateLink — Verified Real Estate Platform</title>
     
     <meta name="description" content="EstateLink connects verified property owners, licensed realtors, and genuine buyers with mandatory National ID verification.">

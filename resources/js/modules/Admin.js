@@ -638,6 +638,16 @@ export class AdminManager {
 
           <!-- Sequential Workflow Actions -->
           <div style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+            ${(req.status === 'schedule_fixed' || req.status === 'inspection_completed') ? `
+              <button class="btn btn-secondary btn-sm chat-open-btn"
+                      data-request-id="${req.id}"
+                      data-user-id="${state.user?.id || 0}"
+                      data-property-title="${escapeHtml(req.property_title || 'Property')}"
+                      data-inspection="${req.inspection_scheduled_at ? new Date(req.inspection_scheduled_at).toLocaleString() : 'Scheduled Inspection'}">
+                💬 View Chat Logs
+              </button>
+            ` : ''}
+
             ${(req.status === 'forwarded_to_admin' || req.status === 'schedule_fixed') ? `
               <button class="btn btn-primary btn-sm" onclick="openAdminScheduleModal(${req.id})">
                 📅 ${req.status === 'schedule_fixed' ? 'Reschedule Inspection' : 'Fix Schedule'}

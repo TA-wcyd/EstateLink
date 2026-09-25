@@ -4,6 +4,7 @@
  */
 
 import './bootstrap';
+import './chat';
 import { state } from './state';
 import { showToast, formatCurrency, escapeHtml, renderPagination } from './utils';
 import { ThemeManager } from './modules/Theme';

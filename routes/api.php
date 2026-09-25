@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminAuctionController;
 use App\Http\Controllers\AdminPropertyController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\AuctionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PropertyController;
@@ -84,6 +85,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/seller/requests',                              [PropertyRequestController::class, 'sellerIndex']);
     Route::post('/seller/requests/{id}/decline',                [PropertyRequestController::class, 'sellerDecline']);
     Route::post('/seller/requests/{id}/forward',                [PropertyRequestController::class, 'sellerForward']);
+
+    // ─────────────────────────────────────────
+    //  Real-Time Chat Endpoints
+    // ─────────────────────────────────────────
+    Route::get('/chat-rooms/{requestId}',                       [ChatController::class, 'index']);
+    Route::post('/chat-rooms/{requestId}/messages',             [ChatController::class, 'store'])->middleware('throttle:30,1');
+    Route::post('/chat-rooms/{requestId}/read',                 [ChatController::class, 'markRead']);
 
     // ─────────────────────────────────────────
     //  Admin-only Routes (role = admin required)
