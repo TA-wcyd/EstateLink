@@ -208,6 +208,15 @@ export class PropertyRequestsManager {
               <button class="btn btn-secondary btn-sm w-full" onclick="openPropertyDetailModal(${req.property_id})">
                 View Property
               </button>
+              ${(req.status === 'schedule_fixed' || req.status === 'inspection_completed') ? `
+                <button class="btn btn-primary btn-sm w-full chat-open-btn"
+                        data-request-id="${req.id}"
+                        data-user-id="${state.user?.id || 0}"
+                        data-property-title="${escapeHtml(req.property_title || 'Property')}"
+                        data-inspection="${req.inspection_scheduled_at ? new Date(req.inspection_scheduled_at).toLocaleString() : 'Scheduled Inspection'}">
+                  💬 Chat with Seller
+                </button>
+              ` : ''}
             </div>
           </div>
         `;
@@ -341,6 +350,24 @@ export class PropertyRequestsManager {
                 </button>
                 <button class="btn btn-primary btn-sm" ${hasLockedRequest ? 'disabled title="Another request is already in inspection"' : ''} onclick="sellerForwardRequest(${r.id}, ${propId}, '${escapeHtml(propTitle).replace(/'/g, "\\'")}')">
                   ✓ Approve & Forward to Admin
+                </button>
+              </div>
+            ` : ''}
+
+            ${(r.status === 'schedule_fixed' || r.status === 'inspection_completed') ? `
+              <div style="background: rgba(99, 102, 241, 0.08); border-left: 4px solid #6366f1; padding: 10px 12px; border-radius: var(--radius-sm); margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div>
+                  <strong style="color: #6366f1; font-size: 0.9rem;">📅 Confirmed Inspection Meeting Unlocked!</strong>
+                  <div style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: 2px;">
+                    Scheduled: <strong>${r.inspection_scheduled_at ? new Date(r.inspection_scheduled_at).toLocaleString() : 'Fixed by Admin'}</strong>
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-sm chat-open-btn"
+                        data-request-id="${r.id}"
+                        data-user-id="${state.user?.id || 0}"
+                        data-property-title="${escapeHtml(propTitle || 'Property')}"
+                        data-inspection="${r.inspection_scheduled_at ? new Date(r.inspection_scheduled_at).toLocaleString() : 'Scheduled Inspection'}">
+                  💬 Chat with Buyer
                 </button>
               </div>
             ` : ''}
