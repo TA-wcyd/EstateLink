@@ -48,6 +48,22 @@ export class Router {
       }
     }
 
+    // Direct public user profile link /user-profile/:id or /user/:id
+    if (path.startsWith('/user-profile/') || path.startsWith('/user/')) {
+      const parts = path.split('/');
+      const id = parts[parts.length - 1];
+      if (id && !isNaN(id)) {
+        Router.showView('view-user-profile');
+        if (window.PublicProfileManager && window.PublicProfileManager.loadPublicProfile) {
+          window.PublicProfileManager.loadPublicProfile(id);
+        } else if (window.loadPublicProfile) {
+          window.loadPublicProfile(id);
+        }
+        Router.updateNavActiveState('/user-profile');
+        return;
+      }
+    }
+
     // Update Nav Active states
     Router.updateNavActiveState(path);
 

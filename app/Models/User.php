@@ -26,6 +26,9 @@ class User extends Authenticatable
         'company_name',
         'role',
         'verification_status',
+        'is_banned',
+        'ban_reason',
+        'banned_at',
     ];
 
     /**
@@ -45,7 +48,9 @@ class User extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        'password' => 'hashed', // Laravel 10+ automatic hashing cast
+        'password'  => 'hashed', // Laravel 10+ automatic hashing cast
+        'is_banned' => 'boolean',
+        'banned_at' => 'datetime',
     ];
 
     /**
@@ -70,6 +75,14 @@ class User extends Authenticatable
     public function isVerified(): bool
     {
         return $this->verification_status === 'verified';
+    }
+
+    /**
+     * Check if this user's account is banned.
+     */
+    public function isBanned(): bool
+    {
+        return (bool) $this->is_banned;
     }
 
     /**
@@ -155,5 +168,15 @@ class User extends Authenticatable
     public function chatMessages()
     {
         return $this->hasMany(ChatMessage::class, 'sender_id');
+    }
+
+    public function submittedReports()
+    {
+        return $this->hasMany(UserReport::class, 'reporter_id');
+    }
+
+    public function reportsReceived()
+    {
+        return $this->hasMany(UserReport::class, 'reported_user_id');
     }
 }

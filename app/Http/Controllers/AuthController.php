@@ -84,6 +84,14 @@ class AuthController extends Controller
         $user = Auth::user();
         Auth::guard('web')->logout();
 
+        // Check if user is banned
+        if ($user->is_banned) {
+            $user->tokens()->delete();
+            throw ValidationException::withMessages([
+                'email' => ['Your account has been permanently suspended due to violation of platform policies.'],
+            ]);
+        }
+
         // Revoke all previous tokens so each device gets a fresh token
         $user->tokens()->delete();
 

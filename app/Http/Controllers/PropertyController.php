@@ -515,6 +515,7 @@ class PropertyController extends Controller
 
         $data = [
             'id'                 => $property->id,
+            'user_id'            => $property->user_id,
             'title'              => $property->title,
             'property_type'      => $property->property_type,
             'price'              => $property->price,
@@ -533,6 +534,7 @@ class PropertyController extends Controller
                 'is_primary' => $img->is_primary,
             ]),
             'seller' => [
+                'id'                  => $property->user_id,
                 'name'                => $property->user?->name,
                 'phone'               => $property->phone ?? $property->user?->phone,
                 'company_name'        => $property->user?->company_name,

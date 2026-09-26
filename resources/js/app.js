@@ -17,6 +17,7 @@ import { ProfileManager } from './modules/Profile';
 import { AdminManager } from './modules/Admin';
 import { AuctionManager } from './modules/Auction';
 import { PropertyRequestsManager } from './modules/PropertyRequests';
+import { PublicProfileManager } from './modules/PublicProfile';
 import './comparator';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +126,21 @@ window.openSellerRequestsModal = PropertyRequestsManager.openSellerRequestsModal
 window.sellerForwardRequest = PropertyRequestsManager.sellerForwardRequest;
 window.sellerDeclineRequest = PropertyRequestsManager.sellerDeclineRequest;
 
+// Public User Profile & Violation Reporting
+window.AdminManager = AdminManager;
+window.PublicProfileManager = PublicProfileManager;
+window.loadPublicProfile = PublicProfileManager.loadPublicProfile;
+window.openReportUserModal = PublicProfileManager.openReportModal;
+window.closeReportUserModal = PublicProfileManager.closeReportModal;
+window.submitUserReport = PublicProfileManager.submitReport;
+window.loadAdminReports = AdminManager.loadAdminReports;
+window.openAdminReportDetailModal = AdminManager.openAdminReportDetailModal;
+window.banUserFromReportAction = AdminManager.banUserFromReportAction;
+window.dismissReportAction = AdminManager.dismissReportAction;
+window.loadAdminUsers = AdminManager.loadAdminUsers;
+window.directBanUserAction = AdminManager.directBanUserAction;
+window.directUnbanUserAction = AdminManager.directUnbanUserAction;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Bindings & Initializers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,6 +151,9 @@ function bindEventHandlers() {
 
   // Profile Edit Form Submission
   document.getElementById('form-edit-profile')?.addEventListener('submit', ProfileManager.handleProfileUpdate);
+
+  // Report User Form Submission
+  document.getElementById('form-report-user')?.addEventListener('submit', PublicProfileManager.submitReport);
 
   // Close modals on overlay / close button click
   document.querySelectorAll('.modal-close-btn, .modal-backdrop').forEach(element => {

@@ -39,6 +39,19 @@ export class AdminManager {
         const inspSpan = document.getElementById('admin-inspections-count');
         if (inspSpan) inspSpan.textContent = inspCount;
       }
+
+      const repRes = await fetch('/api/admin/reports?status=pending', {
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (repRes.ok) {
+        const repData = await repRes.json();
+        const repCount = repData.counts ? repData.counts.pending : 0;
+        const repSpan = document.getElementById('admin-reports-count');
+        if (repSpan) repSpan.textContent = repCount;
+      }
     } catch (error) {
       console.warn('Unable to load admin pending counts:', error);
     }
@@ -51,6 +64,8 @@ export class AdminManager {
     const btnPending = document.getElementById('btn-admin-tab-pending');
     const btnBidding = document.getElementById('btn-admin-tab-bidding');
     const btnInspections = document.getElementById('btn-admin-tab-inspections');
+    const btnReports = document.getElementById('btn-admin-tab-reports');
+    const btnUsers = document.getElementById('btn-admin-tab-users');
     const btnAll = document.getElementById('btn-admin-tab-all');
 
     if (!container || !state.token) return;
@@ -61,6 +76,10 @@ export class AdminManager {
     btnBidding?.classList.add('btn-secondary');
     btnInspections?.classList.remove('btn-primary');
     btnInspections?.classList.add('btn-secondary');
+    btnReports?.classList.remove('btn-primary');
+    btnReports?.classList.add('btn-secondary');
+    btnUsers?.classList.remove('btn-primary');
+    btnUsers?.classList.add('btn-secondary');
     btnAll?.classList.remove('btn-primary');
     btnAll?.classList.add('btn-secondary');
 
@@ -75,6 +94,14 @@ export class AdminManager {
       btnInspections?.classList.remove('btn-secondary');
       btnInspections?.classList.add('btn-primary');
       return AdminManager.loadAdminInspectionQueue(page);
+    } else if (tab === 'reports') {
+      btnReports?.classList.remove('btn-secondary');
+      btnReports?.classList.add('btn-primary');
+      return AdminManager.loadAdminReports('pending');
+    } else if (tab === 'users') {
+      btnUsers?.classList.remove('btn-secondary');
+      btnUsers?.classList.add('btn-primary');
+      return AdminManager.loadAdminUsers();
     } else {
       btnAll?.classList.remove('btn-secondary');
       btnAll?.classList.add('btn-primary');
@@ -925,6 +952,524 @@ export class AdminManager {
     }
     if (window.loadAdminProfileCounters) window.loadAdminProfileCounters();
     AdminManager.loadAdminPendingCount();
+  }
+
+  static async loadAdminReports(filterStatus = 'pending') {
+    const container = document.getElementById('admin-queue-container');
+    const pagination = document.getElementById('admin-pagination-container');
+    if (!container || !state.token) return;
+
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p>Loading submitted violation reports...</p>
+      </div>
+    `;
+    if (pagination) pagination.innerHTML = '';
+
+    try {
+      const response = await fetch(`/api/admin/reports?status=${filterStatus}`, {
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to load reports');
+
+      const data = await response.json();
+      const reports = data.reports || [];
+      const counts = data.counts || { pending: 0, resolved_banned: 0, dismissed: 0, total: 0 };
+
+      let html = `
+        <div class="admin-reports-header mb-3 flex flex-between align-center">
+          <div>
+            <h3>🚩 User Policy Violation Reports</h3>
+            <p class="text-sm text-muted">Review reports submitted by users, inspect proof attachments, and take enforcement actions.</p>
+          </div>
+          <div class="filter-pills flex gap-2">
+            <button class="btn btn-sm ${filterStatus === 'pending' ? 'btn-primary' : 'btn-secondary'}" onclick="AdminManager.loadAdminReports('pending')">Pending (${counts.pending})</button>
+            <button class="btn btn-sm ${filterStatus === 'resolved_banned' ? 'btn-primary' : 'btn-secondary'}" onclick="AdminManager.loadAdminReports('resolved_banned')">Banned (${counts.resolved_banned})</button>
+            <button class="btn btn-sm ${filterStatus === 'dismissed' ? 'btn-primary' : 'btn-secondary'}" onclick="AdminManager.loadAdminReports('dismissed')">Dismissed (${counts.dismissed})</button>
+            <button class="btn btn-sm ${filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="AdminManager.loadAdminReports('all')">All (${counts.total})</button>
+          </div>
+        </div>
+      `;
+
+      if (reports.length === 0) {
+        html += `
+          <div class="state-box">
+            <div class="state-icon">✅</div>
+            <h3>No ${filterStatus === 'all' ? '' : filterStatus} Reports Found</h3>
+            <p>There are no submitted policy violation reports matching this filter.</p>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Reporter</th>
+                  <th>Reported User</th>
+                  <th>Reason</th>
+                  <th>Submitted</th>
+                  <th>Proof Attachment</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        reports.forEach(r => {
+          let statusBadge = '';
+          if (r.status === 'pending') {
+            statusBadge = '<span class="status-chip chip-pending">⏳ Pending Review</span>';
+          } else if (r.status === 'resolved_banned') {
+            statusBadge = '<span class="status-chip chip-rejected">⛔ User Banned</span>';
+          } else {
+            statusBadge = '<span class="status-chip" style="background:#f3f4f6; color:#6b7280;">✓ Dismissed</span>';
+          }
+
+          const reporterName = r.reporter ? escapeHtml(r.reporter.name) : 'Anonymous';
+          const reportedName = r.reported_user ? escapeHtml(r.reported_user.name) : 'Unknown User';
+          const dateStr = new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+          html += `
+            <tr>
+              <td>#${r.id}</td>
+              <td>
+                <span class="user-link" onclick="navigateTo('/user-profile/${r.reporter?.id}')">${reporterName}</span>
+              </td>
+              <td>
+                <strong class="user-link" onclick="navigateTo('/user-profile/${r.reported_user?.id}')">${reportedName}</strong>
+                ${r.reported_user?.is_banned ? ' <span class="badge-banned-sm">Banned</span>' : ''}
+              </td>
+              <td><span class="badge-reason">${escapeHtml(r.reason)}</span></td>
+              <td>${dateStr}</td>
+              <td>
+                ${r.proof_url ? `<a href="${r.proof_url}" target="_blank" class="btn btn-xs btn-outline">📎 View Proof</a>` : '<span class="text-muted text-xs">No attachment</span>'}
+              </td>
+              <td>${statusBadge}</td>
+              <td>
+                <button class="btn btn-sm btn-primary" onclick="AdminManager.openAdminReportDetailModal(${r.id})">Review & Action</button>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    } catch (err) {
+      console.error('Error loading admin reports:', err);
+      container.innerHTML = `
+        <div class="state-box">
+          <h3>Error Loading Reports</h3>
+          <p>Unable to retrieve violation reports.</p>
+        </div>
+      `;
+    }
+  }
+
+  static async openAdminReportDetailModal(reportId) {
+    if (!state.token) return;
+
+    if (window.closeAllModals) window.closeAllModals();
+
+    const modal = document.getElementById('modal-admin-report-detail');
+    const container = document.getElementById('admin-report-detail-content');
+
+    if (!modal || !container) return;
+
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p>Fetching report evidence & user history...</p>
+      </div>
+    `;
+
+    modal.classList.add('active');
+
+    try {
+      const response = await fetch(`/api/admin/reports/${reportId}`, {
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Report details fetch failed');
+
+      const data = await response.json();
+      const report = data.report;
+      const reportedUser = data.reported_user;
+
+      let proofElementHtml = '<p class="text-muted">No proof document attached.</p>';
+      if (report.proof_url) {
+        if (report.proof_is_pdf) {
+          proofElementHtml = `
+            <div class="proof-box">
+              <p>📄 <strong>PDF Evidence Document Attached</strong></p>
+              <a href="${report.proof_url}" target="_blank" download class="btn btn-sm btn-primary mt-2">📥 Download / View PDF Evidence</a>
+            </div>
+          `;
+        } else {
+          proofElementHtml = `
+            <div class="proof-box">
+              <p>🖼️ <strong>Image Evidence Uploaded:</strong></p>
+              <a href="${report.proof_url}" target="_blank">
+                <img src="${report.proof_url}" alt="Report Evidence" style="max-width:100%; max-height:300px; border-radius:8px; margin-top:8px; border:1px solid var(--color-border);" />
+              </a>
+              <div class="text-xs text-muted mt-1">Click image to expand in new tab</div>
+            </div>
+          `;
+        }
+      }
+
+      let actionsHtml = '';
+      if (report.status === 'pending') {
+        actionsHtml = `
+          <div class="admin-action-box p-3 mt-4" style="background:var(--color-bg-alt); border-radius:8px;">
+            <h4>⚡ Take Admin Action</h4>
+            <div class="form-group mt-2">
+              <label class="form-label">Audit Notes / Reason for Action (Optional)</label>
+              <textarea id="admin-report-notes" class="form-control" placeholder="Enter notes or explanation for audit logs..."></textarea>
+            </div>
+            <div class="flex gap-3 mt-3">
+              <button class="btn btn-danger" onclick="AdminManager.banUserFromReportAction(${report.id})">⛔ Permanently Ban User & Resolve</button>
+              <button class="btn btn-secondary" onclick="AdminManager.dismissReportAction(${report.id})">✓ Dismiss False/Unverified Report</button>
+            </div>
+          </div>
+        `;
+      } else {
+        actionsHtml = `
+          <div class="admin-action-box p-3 mt-4" style="background:var(--color-bg-alt); border-radius:8px;">
+            <h4>Report Action Record</h4>
+            <p><strong>Status:</strong> ${report.status === 'resolved_banned' ? '⛔ Resolved (User Permanently Banned)' : '✓ Dismissed'}</p>
+            <p><strong>Actioned By:</strong> ${report.actioned_by ? escapeHtml(report.actioned_by.name) : 'Admin'}</p>
+            <p><strong>Notes:</strong> ${escapeHtml(report.admin_notes || 'None')}</p>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="report-detail-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+          <!-- Left: Violation Claim & Evidence -->
+          <div>
+            <h3>Report Details #${report.id}</h3>
+            <div class="mb-3">
+              <span class="text-muted">Reason Category:</span> <strong class="badge-reason">${escapeHtml(report.reason)}</strong>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Reporter:</label>
+              <div>
+                <a href="javascript:void(0)" onclick="navigateTo('/user-profile/${report.reporter?.id}'); closeAllModals();"><strong>${escapeHtml(report.reporter?.name || 'Unknown')}</strong> (${escapeHtml(report.reporter?.email || '')})</a>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Violation Description:</label>
+              <div class="p-3" style="background:var(--color-bg-alt); border-radius:8px; font-size:14px; white-space:pre-wrap;">${escapeHtml(report.description)}</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Attached Evidence Proof:</label>
+              ${proofElementHtml}
+            </div>
+          </div>
+
+          <!-- Right: Reported User History & Profile -->
+          <div>
+            <h3>Reported User Profile History</h3>
+            ${reportedUser ? `
+              <div class="p-3" style="border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface);">
+                <h4>${escapeHtml(reportedUser.name)} ${reportedUser.is_banned ? '<span class="chip-rejected">⛔ BANNED</span>' : ''}</h4>
+                <p class="text-sm"><strong>Email:</strong> ${escapeHtml(reportedUser.email)}</p>
+                <p class="text-sm"><strong>Phone:</strong> ${escapeHtml(reportedUser.phone)}</p>
+                <p class="text-sm"><strong>National ID:</strong> ${escapeHtml(reportedUser.national_id)}</p>
+                <p class="text-sm"><strong>Role:</strong> ${escapeHtml(reportedUser.role)}</p>
+                <p class="text-sm"><strong>Verification Status:</strong> ${escapeHtml(reportedUser.verification_status)}</p>
+                <hr style="margin:10px 0; border:0; border-top:1px solid var(--color-border);" />
+                <p class="text-sm"><strong>Listed Properties:</strong> ${reportedUser.total_properties}</p>
+                <p class="text-sm"><strong>Total Reports Received:</strong> ${reportedUser.total_reports}</p>
+                <div class="mt-2">
+                  <a href="javascript:void(0)" class="btn btn-xs btn-outline" onclick="navigateTo('/user-profile/${reportedUser.id}'); closeAllModals();">View Full Public Profile</a>
+                </div>
+              </div>
+            ` : '<p class="text-muted">Reported user record not available.</p>'}
+          </div>
+        </div>
+
+        ${actionsHtml}
+      `;
+    } catch (err) {
+      console.error('Failed to load report details:', err);
+      container.innerHTML = `
+        <div class="state-box">
+          <h3>Error Loading Details</h3>
+          <p>Could not load report evidence or user details.</p>
+        </div>
+      `;
+    }
+  }
+
+  static async banUserFromReportAction(reportId) {
+    if (!state.token) return;
+
+    const notes = document.getElementById('admin-report-notes')?.value || '';
+
+    if (!confirm('Are you sure you want to PERMANENTLY BAN this user? This will revoke all their active sessions and mark the user account as suspended.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/reports/${reportId}/ban`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          admin_notes: notes,
+          ban_reason: 'Policy violation reported in Report #' + reportId
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(data.message || 'User permanently banned.', 'success');
+        if (window.closeAllModals) window.closeAllModals();
+        AdminManager.loadAdminReports('pending');
+        AdminManager.loadAdminPendingCount();
+      } else {
+        showToast(data.message || 'Failed to ban user.', 'error');
+      }
+    } catch (err) {
+      console.error('Ban action error:', err);
+      showToast('Error communicating with server.', 'error');
+    }
+  }
+
+  static async dismissReportAction(reportId) {
+    if (!state.token) return;
+
+    const notes = document.getElementById('admin-report-notes')?.value || '';
+
+    try {
+      const response = await fetch(`/api/admin/reports/${reportId}/dismiss`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ admin_notes: notes })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(data.message || 'Report dismissed.', 'info');
+        if (window.closeAllModals) window.closeAllModals();
+        AdminManager.loadAdminReports('pending');
+        AdminManager.loadAdminPendingCount();
+      } else {
+        showToast(data.message || 'Failed to dismiss report.', 'error');
+      }
+    } catch (err) {
+      console.error('Dismiss report error:', err);
+      showToast('Error communicating with server.', 'error');
+    }
+  }
+
+  static async loadAdminUsers(searchQuery = '') {
+    const container = document.getElementById('admin-queue-container');
+    const pagination = document.getElementById('admin-pagination-container');
+    if (!container || !state.token) return;
+
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <p>Loading user management directory...</p>
+      </div>
+    `;
+    if (pagination) pagination.innerHTML = '';
+
+    try {
+      const url = searchQuery ? `/api/admin/users?search=${encodeURIComponent(searchQuery)}` : '/api/admin/users';
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('User directory fetch failed');
+
+      const data = await response.json();
+      const users = data.users || [];
+
+      let html = `
+        <div class="admin-users-header mb-3 flex flex-between align-center flex-wrap gap-3">
+          <div>
+            <h3>👥 User Directory & Suspensions</h3>
+            <p class="text-sm text-muted">Manage platform accounts, check verification statuses, and apply permanent bans.</p>
+          </div>
+          <div class="search-box">
+            <input type="text" id="admin-user-search-input" class="form-control form-control-sm" placeholder="Search by name, email or phone..." value="${escapeHtml(searchQuery)}" onkeyup="if(event.key==='Enter') AdminManager.loadAdminUsers(this.value)" />
+          </div>
+        </div>
+      `;
+
+      if (users.length === 0) {
+        html += `
+          <div class="state-box">
+            <p>No user accounts matched your query.</p>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email / Phone</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Reports Received</th>
+                  <th>Properties</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        users.forEach(u => {
+          let statusBadge = '';
+          if (u.is_banned) {
+            statusBadge = '<span class="status-chip chip-rejected">⛔ Banned</span>';
+          } else if (u.verification_status === 'verified') {
+            statusBadge = '<span class="status-chip chip-approved">✓ Verified</span>';
+          } else {
+            statusBadge = '<span class="status-chip chip-pending">⏳ Pending</span>';
+          }
+
+          html += `
+            <tr>
+              <td>#${u.id}</td>
+              <td>
+                <strong class="user-link" onclick="navigateTo('/user-profile/${u.id}')">${escapeHtml(u.name)}</strong>
+              </td>
+              <td>
+                <div class="text-sm">${escapeHtml(u.email)}</div>
+                <div class="text-xs text-muted">${escapeHtml(u.phone)}</div>
+              </td>
+              <td><span class="status-chip">${escapeHtml(u.role)}</span></td>
+              <td>${statusBadge}</td>
+              <td><strong>${u.reports_received_count}</strong></td>
+              <td>${u.properties_count}</td>
+              <td>
+                ${u.role === 'admin' ? '<span class="text-muted text-xs">System Admin</span>' : (
+                  u.is_banned ? `
+                    <button class="btn btn-xs btn-outline" onclick="AdminManager.directUnbanUserAction(${u.id})">Unban Account</button>
+                  ` : `
+                    <button class="btn btn-xs btn-danger" onclick="AdminManager.directBanUserAction(${u.id})">⛔ Ban User</button>
+                  `
+                )}
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    } catch (err) {
+      console.error('Error loading admin users:', err);
+      container.innerHTML = `
+        <div class="state-box">
+          <h3>Error Loading Users</h3>
+          <p>Unable to retrieve user directory.</p>
+        </div>
+      `;
+    }
+  }
+
+  static async directBanUserAction(userId) {
+    if (!state.token) return;
+
+    const reason = prompt('Enter the reason for permanently banning this user account:');
+    if (!reason || !reason.trim()) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/ban`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ ban_reason: reason.trim() })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(data.message || 'User account has been banned.', 'success');
+        AdminManager.loadAdminUsers();
+      } else {
+        showToast(data.message || 'Failed to ban user.', 'error');
+      }
+    } catch (err) {
+      console.error('Direct ban error:', err);
+      showToast('Error communicating with server.', 'error');
+    }
+  }
+
+  static async directUnbanUserAction(userId) {
+    if (!state.token) return;
+
+    if (!confirm('Are you sure you want to UNBAN this user account and restore access?')) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/unban`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast(data.message || 'User account unbanned successfully.', 'info');
+        AdminManager.loadAdminUsers();
+      } else {
+        showToast(data.message || 'Failed to unban user.', 'error');
+      }
+    } catch (err) {
+      console.error('Direct unban error:', err);
+      showToast('Error communicating with server.', 'error');
+    }
   }
 
   static setupAdminFormHandlers() {
