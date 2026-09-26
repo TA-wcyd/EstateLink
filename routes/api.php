@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\AdminAuctionController;
 use App\Http\Controllers\AdminPropertyController;
+use App\Http\Controllers\AdminUserReportController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\AuctionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\PropertyCompareController;
 use App\Http\Controllers\PropertyRequestController;
+use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\UserReportController;
 use App\Http\Controllers\UsersController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -29,7 +32,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login'])->name('login');
 
 // ─────────────────────────────────────────────
-//  Public Property, Comparator & Live Auction Polling Routes
+//  Public Property, User Profile, Comparator & Live Auction Polling Routes
 //  STRICT RULE: ONLY approved properties returned.
 // ─────────────────────────────────────────────
 Route::get('/properties',                 [PropertyController::class, 'index']);
@@ -40,16 +43,22 @@ Route::get('/properties/{id}',            [PropertyController::class, 'show']);
 Route::get('/properties/{id}/auction',    [AuctionController::class, 'showAuction']);
 Route::get('/properties/{id}/bids',       [AuctionController::class, 'showAuction']); // alias
 
+// Public user profile
+Route::get('/users/{id}/public-profile',  [UserProfileController::class, 'showPublicProfile']);
+
 // ─────────────────────────────────────────────
-//  Protected Routes (Bearer token required)
+//  Protected Routes (Bearer token required & User not banned)
 // ─────────────────────────────────────────────
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'not_banned'])->group(function () {
 
     // Auth session
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
     Route::put('/profile',  [AuthController::class, 'updateProfile']);
     Route::post('/profile', [AuthController::class, 'updateProfile']);
+
+    // User Violations & Reporting with Proof
+    Route::post('/user-reports', [UserReportController::class, 'store']);
 
     // ─────────────────────────────────────────
     //  Seller / Property Management Endpoints
@@ -93,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ─────────────────────────────────────────
     //  Real-Time Chat Endpoints
     // ─────────────────────────────────────────
+    // Chat rooms require authentication & non-banned status
     Route::get('/chat-rooms/{requestId}',                       [ChatController::class, 'index']);
     Route::post('/chat-rooms/{requestId}/messages',             [ChatController::class, 'store'])->middleware('throttle:30,1');
     Route::post('/chat-rooms/{requestId}/read',                 [ChatController::class, 'markRead']);
@@ -124,12 +134,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requests/{id}/complete-inspection',                                [PropertyRequestController::class, 'adminCompleteInspection']);
         Route::post('/requests/{id}/confirm-sale',                                      [PropertyRequestController::class, 'adminConfirmSale']);
         Route::post('/requests/{id}/cancel',                                            [PropertyRequestController::class, 'adminCancel']);
+
+        // User Violation Reports & Verification Dashboard Workflow
+        Route::get('/reports',                                                           [AdminUserReportController::class, 'index']);
+        Route::get('/reports/{id}',                                                      [AdminUserReportController::class, 'show']);
+        Route::post('/reports/{id}/ban',                                                 [AdminUserReportController::class, 'banUserFromReport']);
+        Route::post('/reports/{id}/dismiss',                                             [AdminUserReportController::class, 'dismissReport']);
+
+        // User Management & Permanent Ban Actions
+        Route::get('/users',                                                             [AdminUserReportController::class, 'listUsers']);
+        Route::post('/users/{id}/ban',                                                   [AdminUserReportController::class, 'directBanUser']);
+        Route::post('/users/{id}/unban',                                                 [AdminUserReportController::class, 'directUnbanUser']);
+        
     });
 });
 
 // ─────────────────────────────────────────────
 //  Legacy dummy CRUD routes (existing UsersController)
-//  Keep these intact to not break existing functionality.
 // ─────────────────────────────────────────────
 Route::get('/items',         [UsersController::class, 'index']);
 Route::get('/items/{id}',    [UsersController::class, 'show']);

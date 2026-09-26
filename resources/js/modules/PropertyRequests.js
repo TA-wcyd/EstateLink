@@ -324,7 +324,7 @@ export class PropertyRequestsManager {
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
               <div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                  <strong style="font-size: 0.98rem;">${escapeHtml(r.buyer?.name || 'Verified Buyer')}</strong>
+                  <strong class="user-link" onclick="navigateTo('/user-profile/${r.buyer_id}'); closeAllModals();" title="Click to view ${escapeHtml(r.buyer?.name || 'Buyer')} profile">${escapeHtml(r.buyer?.name || 'Verified Buyer')}</strong>
                   ${statusBadge}
                 </div>
                 <span style="font-size: 0.78rem; color: var(--color-text-muted);">

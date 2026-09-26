@@ -123,10 +123,10 @@ export class PropertiesManager {
                 ${p.bathrooms !== null ? `<span class="spec-item">🚿 ${p.bathrooms} Baths</span>` : ''}
               </div>
               <div class="card-footer">
-                <div class="seller-mini">
+                <div class="seller-mini" onclick="event.stopPropagation(); const sId = ${p.user_id || p.seller?.id || 0}; if(sId) navigateTo('/user-profile/' + sId);" style="cursor: pointer; transition: opacity 0.2s ease;" title="Click to view ${escapeHtml(p.seller?.name || 'Seller')} profile">
                   <div class="seller-avatar-mini">✓</div>
                   <div>
-                    <strong>${escapeHtml(p.seller?.name || 'Verified Seller')}</strong>
+                    <strong class="user-link">${escapeHtml(p.seller?.name || 'Verified Seller')}</strong>
                     ${p.seller?.company_name ? `<div style="font-size: 0.72rem; color: var(--color-text-muted);">${escapeHtml(p.seller.company_name)}</div>` : ''}
                   </div>
                 </div>
@@ -260,12 +260,12 @@ export class PropertiesManager {
         </div>
 
         <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="navigateTo('/user-profile/${p.user_id || p.seller?.id}'); closeAllModals();" title="View Public Profile">
             <div class="user-avatar" style="width: 44px; height: 44px; font-size: 1.1rem;">
               ${(p.seller?.name || 'S')[0].toUpperCase()}
             </div>
             <div>
-              <h4 style="font-size: 1rem; margin-bottom: 2px;">${escapeHtml(p.seller?.name || 'Verified Owner')}</h4>
+              <h4 style="font-size: 1rem; margin-bottom: 2px; text-decoration: underline;">${escapeHtml(p.seller?.name || 'Verified Owner')}</h4>
               <div style="font-size: 0.8rem; color: var(--color-text-muted);">
                 ${p.seller?.company_name ? escapeHtml(p.seller.company_name) + ' • ' : ''}
                 <span style="color: var(--color-success); font-weight: 700;">✓ Verified Seller</span>
@@ -274,6 +274,9 @@ export class PropertiesManager {
           </div>
 
           <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="const sId = ${p.user_id || p.seller?.id || 0}; if(sId) { navigateTo('/user-profile/' + sId); closeAllModals(); }">
+              👤 Visit Profile
+            </button>
             <button type="button" class="btn btn-secondary btn-compare-toggle ${window.isInCompare && window.isInCompare(p.id) ? 'active' : ''}" data-property-id="${p.id}" onclick="window.toggleCompare(${p.id}); this.classList.toggle('active'); this.innerHTML = window.isInCompare(${p.id}) ? '✓ Compared' : '+ Compare';">
               ${window.isInCompare && window.isInCompare(p.id) ? '✓ Compared' : '+ Compare'}
             </button>

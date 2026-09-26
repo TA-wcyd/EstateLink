@@ -521,6 +521,12 @@
                     <button class="btn btn-sm btn-secondary" id="btn-admin-tab-inspections" onclick="loadAdminQueue('inspections')">
                         🔍 Inspection Queue (<span id="admin-inspections-count">0</span>)
                     </button>
+                    <button class="btn btn-sm btn-secondary" id="btn-admin-tab-reports" onclick="loadAdminQueue('reports')">
+                        🚩 Violation Reports (<span id="admin-reports-count">0</span>)
+                    </button>
+                    <button class="btn btn-sm btn-secondary" id="btn-admin-tab-users" onclick="loadAdminQueue('users')">
+                        👥 User Directory & Bans
+                    </button>
                     <button class="btn btn-sm btn-secondary" id="btn-admin-tab-all" onclick="loadAdminQueue('all')">
                         📋 All Properties History
                     </button>
@@ -721,7 +727,21 @@
             </div>
 
             <!-- ===============================================================
-                 VIEW 7: SIDE-BY-SIDE PROPERTY COMPARATOR (/compare)
+                 VIEW 7: PUBLIC USER PROFILE & ACTIVITY (/user-profile/:id)
+                 =============================================================== -->
+            <div id="view-user-profile" class="app-view">
+                <div class="page-header" style="margin-bottom: 24px;">
+                    <button class="btn btn-secondary btn-sm mb-2" onclick="window.history.back()" style="margin-bottom: 12px;">← Back to Platform</button>
+                    <h2 class="page-title">Public User Profile</h2>
+                    <p class="page-subtitle">View member verification badges, public property listings, and platform activity stats.</p>
+                </div>
+                <div id="public-profile-container">
+                    <!-- Populated dynamically via PublicProfileManager -->
+                </div>
+            </div>
+
+            <!-- ===============================================================
+                 VIEW 8: SIDE-BY-SIDE PROPERTY COMPARATOR (/compare)
                  =============================================================== -->
             <div id="view-compare" class="app-view">
                 @include('comparator.Compare')
@@ -1119,6 +1139,64 @@
                     <button type="submit" class="btn btn-danger" id="btn-confirm-cancel-deal">Confirm Cancellation</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 13. User Violation Report Modal with Proof Upload -->
+    <div class="modal-backdrop" id="modal-report-user">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem; color: #ef4444;">🚩 Report User Policy Violation</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <form id="form-report-user" onsubmit="submitUserReport(event)" enctype="multipart/form-data">
+                <input type="hidden" id="report-reported-user-id" value="">
+
+                <div class="form-field">
+                    <label>Reported User</label>
+                    <input type="text" id="report-reported-user-name" class="form-control" readonly style="background: var(--color-bg-alt); font-weight: 700;">
+                </div>
+
+                <div class="form-field">
+                    <label for="report-reason">Violation Category *</label>
+                    <select id="report-reason" required>
+                        <option value="Fraud/Scam">Fraud / Scam Activity</option>
+                        <option value="Fake Listing">Fake / Misleading Listing</option>
+                        <option value="Abusive Behavior">Abusive Behavior / Harassment</option>
+                        <option value="Impersonation">Impersonation / Unauthorized Agent</option>
+                        <option value="Other">Other Policy Violation</option>
+                    </select>
+                </div>
+
+                <div class="form-field">
+                    <label for="report-description">Detailed Explanation / Description *</label>
+                    <textarea id="report-description" placeholder="Provide full details of the violation, transaction issues, or illegal activity (at least 10 characters)..." required style="min-height: 110px;"></textarea>
+                </div>
+
+                <div class="form-field">
+                    <label for="report-proof-file">Proof Attachment (Image or PDF up to 5MB)</label>
+                    <input type="file" id="report-proof-file" accept="image/jpeg,image/png,image/webp,application/pdf" class="form-control">
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted);">Attach screenshot, payment receipt, chat history, or document proof (max 5MB).</span>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAllModals()">Cancel</button>
+                    <button type="submit" class="btn btn-danger" id="btn-submit-report">Submit Report for Review</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 14. Admin User Violation Report Review & Audit Modal -->
+    <div class="modal-backdrop" id="modal-admin-report-detail">
+        <div class="modal-card modal-card-lg">
+            <div class="modal-header">
+                <h3 style="font-size: 1.25rem;">🛡️ Audit User Violation Report</h3>
+                <button class="modal-close-btn" type="button" onclick="closeAllModals()">&times;</button>
+            </div>
+            <div id="admin-report-detail-content" style="max-height: 75vh; overflow-y: auto;">
+                <!-- Populated dynamically via AdminManager.openAdminReportDetailModal -->
+            </div>
         </div>
     </div>
 
