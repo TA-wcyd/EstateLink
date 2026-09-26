@@ -1,0 +1,74 @@
+/* ==========================================================================
+   My Properties Module Styles
+   Seller Dashboard Stats Grid, Property Submission Cards & Rejection Notices
+   ========================================================================== */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 800px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.stat-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.my-property-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: 20px;
+  align-items: center;
+  box-shadow: var(--shadow-subtle);
+}
+
+@media (max-width: 768px) {
+  .my-property-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.my-prop-img {
+  width: 100%;
+  height: 120px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background-color: #0f172a;
+}
+
+.rejection-banner {
+  background-color: rgba(239, 68, 68, 0.08);
+  border-left: 4px solid #ef4444;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
