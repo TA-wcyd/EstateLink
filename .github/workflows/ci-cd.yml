@@ -1,4 +1,4 @@
-name: EstateLink CI
+name: EstateLink CI/CD
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
 
 jobs:
   laravel-ci:
+    name: Test & Build CI
     runs-on: ubuntu-latest
 
     steps:
@@ -70,3 +71,22 @@ jobs:
           DB_CONNECTION: sqlite
           DB_DATABASE: database/database.sqlite
         run: php artisan test
+
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    needs: laravel-ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set in GitHub repository settings!"
+            exit 1
+          fi
+          echo "Triggering Render deployment webhook..."
+          curl -f -s -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Render deployment triggered successfully!"
