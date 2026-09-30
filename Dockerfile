@@ -65,7 +65,8 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 # Copy application source code
 COPY . .
 
-# Copy compiled frontend assets from Stage 1
+# Ensure no hot reload file exists and copy compiled frontend assets from Stage 1
+RUN rm -f public/hot
 COPY --from=frontend-builder /app/public/build ./public/build
 
 # Complete Composer autoloader optimization and ensure writable directories
